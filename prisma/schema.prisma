@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String   @id @default(uuid())
+  username String   @unique
+  password String
+  role     String
+  submissions TestSubmission[]
+}
+
+model Test {
+  id        String     @id @default(uuid())
+  name      String
+  questions Question[]
+  createdAt DateTime   @default(now())
+  testSettings TestSettings?
+  variants TestVariant[]
+  submissions TestSubmission[]
+}
+
+model Question {
+  id      String   @id @default(uuid())
+  text    String
+  test    Test     @relation(fields: [testId], references: [id])
+  testId  String
+  answers Answer[]
+}
+
+model Answer {
+  id         String   @id @default(uuid())
+  text       String
+  isCorrect  Boolean
+  question   Question @relation(fields: [questionId], references: [id])
+  questionId String
+}
+
+model TestSettings {
+  id               String   @id @default(uuid())
+  test             Test     @relation(fields: [testId], references: [id])
+  testId           String   @unique
+  userId           String?  // Optional: for per-user settings
+  shuffle_questions Boolean
+  shuffle_answers   Boolean
+  shuffle_all       Boolean
+}
+
+model TestVariant {
+  id        String   @id @default(uuid())
+  test      Test     @relation(fields: [testId], references: [id])
+  testId    String
+  settings  Json
+  filePath  String
+  createdAt DateTime @default(now())
+}
+
+model TestSubmission {
+  id           String   @id @default(uuid())
+  user         User?    @relation(fields: [userId], references: [id])
+  userId       String?
+  test         Test     @relation(fields: [testId], references: [id])
+  testId       String
+  answers      Json
+  correctCount Int
+  incorrect    Json
+  createdAt    DateTime @default(now())
+}
