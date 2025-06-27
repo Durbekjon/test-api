@@ -107,7 +107,7 @@ export class TestsService {
     if (!test) throw new Error('Test not found');
     const settings = test.testSettings || { shuffle_questions: false, shuffle_answers: false, shuffle_all: false };
     const variants = [];
-    const outputDir = path.join(process.cwd(), 'generated');
+    const outputDir = path.join(process.cwd(), 'public/generated');
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
     for (let i = 0; i < copies; i++) {
       // Deep copy questions/answers
@@ -292,7 +292,7 @@ export class TestsService {
       });
     });
 
-    const filePath = path.join(process.cwd(), 'generated', `submissions-${testId}-${Date.now()}.xlsx`);
+    const filePath = path.join(process.cwd(), 'public', 'generated', `submissions-${testId}-${Date.now()}.xlsx`);
     await workbook.xlsx.writeFile(filePath);
     return filePath;
   }

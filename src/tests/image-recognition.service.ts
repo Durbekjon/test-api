@@ -17,7 +17,10 @@ export interface BubbleDetectionOptions {
 
 export interface BubbleResult {
   marked: number[]; // global bubble indices
-  perQuestion: { question: number; selected: number[] }[];
+  perQuestion: { 
+    question: number; 
+    selected: string[] // Changed from number[] to string[] for letter options
+  }[];
   debugOverlayPath?: string;
   warning?: string;
   debug?: Array<{
@@ -111,6 +114,14 @@ export class ImageRecognitionService {
     const columnWidth = meta.width! / numberOfColumns;
     const rowHeight = meta.height! / questionsPerColumn;
 
+    // Add validation for dimensions
+    console.log('Image dimensions:', {
+      width: meta.width,
+      height: meta.height,
+      columnWidth,
+      rowHeight
+    });
+
     // First, assign column and rough position to each bubble
     bubbles.forEach(bubble => {
       const colIdx = Math.floor(bubble.center.x / columnWidth);
@@ -118,6 +129,15 @@ export class ImageRecognitionService {
       bubble.colIdx = colIdx;
       bubble.rowIdx = rowIdx;
     });
+
+    // Validate bubble assignments
+    const bubbleAssignments = bubbles.reduce((acc, bubble) => {
+      const key = `col${bubble.colIdx}row${bubble.rowIdx}`;
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log('Bubble assignments per cell:', bubbleAssignments);
 
     // Group bubbles by question rows
     const questionRows: Bubble[][] = [];
@@ -179,12 +199,12 @@ export class ImageRecognitionService {
     });
 
     const marked: number[] = [];
-    const perQuestion: { question: number; selected: number[] }[] = [];
+    const perQuestion: { question: number; selected: string[] }[] = [];
     const debugInfo: BubbleResult['debug'] = [];
 
     for (let qIdx = 0; qIdx < questionBubbles.length; qIdx++) {
       const group = questionBubbles[qIdx];
-      const selected: number[] = [];
+      const markedIndices: number[] = [];
       
       const fillPercentages = await Promise.all(group.map(async bubble => {
         const mask = new cv.Mat(binary.rows, binary.cols, cv.CV_8UC1, 0);
@@ -200,24 +220,32 @@ export class ImageRecognitionService {
         return mean.w;
       }));
 
-      // Calculate adaptive threshold for this group
-      const avgFill = fillPercentages.reduce((a, b) => a + b, 0) / fillPercentages.length;
-      const stdDev = Math.sqrt(
-        fillPercentages.reduce((a, b) => a + Math.pow(b - avgFill, 2), 0) / fillPercentages.length
-      );
-      
-      // Use either the global threshold or an adaptive one based on the group's statistics
+      // Second pass: mark bubbles using the adaptive threshold
+      const fillStats = {
+        min: Math.min(...fillPercentages),
+        max: Math.max(...fillPercentages),
+        avg: fillPercentages.reduce((a, b) => a + b, 0) / fillPercentages.length
+      };
+
+      // Use a more robust threshold calculation
       const effectiveThreshold = Math.min(
         fillThreshold,
-        avgFill + stdDev * 2 // Use 2 standard deviations above mean as threshold
+        (fillStats.min + fillStats.max) / 2 + 20 // Midpoint + margin
       );
 
-      // Second pass: mark bubbles using the adaptive threshold
+      if (qIdx === 9) { // Question 10
+        console.log('Question 10 fill statistics:', {
+          fillStats,
+          effectiveThreshold,
+          fillPercentages
+        });
+      }
+
       group.forEach((bubble, idx) => {
         const fillPercentage = fillPercentages[idx];
         if (fillPercentage > effectiveThreshold) {
           marked.push(bubble.idx);
-          selected.push(bubble.idx);
+          markedIndices.push(idx);
         }
 
         if (debug) {
@@ -234,20 +262,28 @@ export class ImageRecognitionService {
           });
         }
       });
-      
-      // Validate selection (should typically have exactly one marked bubble per question)
-      if (selected.length > 1) {
-        console.warn(`Question ${qIdx + 1} has multiple marks (${selected.length})`);
-      } else if (selected.length === 0) {
-        console.warn(`Question ${qIdx + 1} has no marks`);
+
+      // Convert marked indices to letters
+      const selected = markedIndices.map(idx => String.fromCharCode(65 + idx));
+
+      // Add validation logging
+      if (qIdx === 9) { // Question 10
+        console.log('Question 10 processing:', {
+          group: group.map(b => b.idx),
+          markedIndices,
+          selected,
+          marked,
+          bubbleToLetter: group.map((b, i) => ({
+            bubbleIdx: b.idx,
+            letter: String.fromCharCode(65 + i)
+          }))
+        });
       }
 
-      if (qIdx === 10) {
-        console.log('Selected', selected);
-        console.log('Marked', marked);
-      }
-
-      perQuestion.push({ question: qIdx + 1, selected });
+      perQuestion.push({ 
+        question: qIdx + 1, 
+        selected
+      });
     }
 
     // 10. Optionally save debug overlay

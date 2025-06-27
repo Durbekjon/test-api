@@ -74,7 +74,7 @@ export class TestsController {
   @ApiOperation({ summary: 'Generate randomized test variants (Admin only)' })
   @ApiParam({ name: 'id', type: 'string', description: 'ID of the test' })
   @ApiBody({ type: GenerateDto })
-  @ApiResponse({ status: 201, description: 'List of generated variants', schema: { example: { variants: [{ variantId: 'uuid', filePath: '/generated/uuid.pdf' }] } } })
+  @ApiResponse({ status: 201, description: 'List of generated variants', schema: { example: { variants: [{ variantId: 'uuid', filePath: '/public/generated/uuid.pdf' }] } } })
   @ApiResponse({ status: 404, description: 'Test not found' })
   async generate(@Param('id') id: string, @Body() body: GenerateDto, @CurrentUser() user: JwtUser) {
     if (!body.copies || body.copies < 1) throw new BadRequestException('Copies must be a positive number');
@@ -126,14 +126,20 @@ export class TestsController {
         fillThreshold: 80,
       });
 
-      // Map marked indices to answers
+      // Use perQuestion results directly instead of re-processing marked indices
       const answers: { [questionIndex: number]: string[] } = {};
-      for (const markedIdx of ocrResult.marked) {
-        if (markedIdx < 0 || markedIdx >= bubbleMap.length) continue;
-        const bubble = bubbleMap[markedIdx];
-        if (!answers[bubble.questionIndex]) answers[bubble.questionIndex] = [];
-        answers[bubble.questionIndex].push(bubble.label);
-      }
+      ocrResult.perQuestion.forEach(q => {
+        if (q.selected.length > 0) {
+          answers[q.question - 1] = q.selected;
+        }
+      });
+
+      // Add debug logging for question 10
+      console.log('Processing results for question 10:', {
+        perQuestion: ocrResult.perQuestion[9],
+        answers: answers[9],
+        marked: ocrResult.marked
+      });
 
       // Score and breakdown
       let correctCount = 0;
