@@ -1,8 +1,11 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 import { UserDto } from './dto/user.dto';
+import { RegisterDto } from './dto/user.dto';
+import { LoginDto } from './dto/login.dto';
+import { JwtUser } from './current-user.decorator';
 
 @Injectable()
 export class AuthService {
@@ -10,6 +13,85 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+
+  async register(registerDto: RegisterDto) {
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { username: registerDto.username },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Username already exists');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+
+    // Create new user
+    const user = await this.prisma.user.create({
+      data: {
+        username: registerDto.username,
+        password: hashedPassword,
+        role: registerDto.role,
+      },
+    });
+
+    // Generate JWT token
+    const payload = { sub: user.id, username: user.username, role: user.role };
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    };
+  }
+
+  async login(loginDto: LoginDto) {
+    // Find user
+    const user = await this.prisma.user.findUnique({
+      where: { username: loginDto.username },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Verify password
+    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Generate JWT token
+    const payload = { sub: user.id, username: user.username, role: user.role };
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: {
+        id: user.id,
+        username: user.username,
+        role: user.role,
+      },
+    };
+  }
+
+  async getProfile(user: JwtUser) {
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.userId },
+      select: {
+        id: true,
+        username: true,
+        role: true,
+      },
+    });
+
+    if (!dbUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return dbUser;
+  }
 
   async validateUser(username: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { username } });
@@ -19,13 +101,6 @@ export class AuthService {
     // Don't return password
     const { password: _, ...result } = user;
     return result;
-  }
-
-  async login(user: any) {
-    const payload = { username: user.username, sub: user.id, role: user.role };
-    return {
-      access_token: this.jwtService.sign(payload),
-    };
   }
 
   async getMe(userId: string): Promise<UserDto> {

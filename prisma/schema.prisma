@@ -52,12 +52,14 @@ model TestSettings {
 }
 
 model TestVariant {
-  id        String   @id @default(uuid())
-  test      Test     @relation(fields: [testId], references: [id])
-  testId    String
-  settings  Json
-  filePath  String
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  test        Test     @relation(fields: [testId], references: [id])
+  testId      String
+  settings    Json
+  filePath    String
+  questions   Json     // Store full variant structure with correct answers
+  createdAt   DateTime @default(now())
+  submissions TestSubmission[]
 }
 
 model TestSubmission {
@@ -66,8 +68,11 @@ model TestSubmission {
   userId       String?
   test         Test     @relation(fields: [testId], references: [id])
   testId       String
+  variant      TestVariant? @relation(fields: [variantId], references: [id])
+  variantId    String?
   answers      Json
   correctCount Int
-  incorrect    Json
+  totalCount   Int
+  metadata     Json?
   createdAt    DateTime @default(now())
 }

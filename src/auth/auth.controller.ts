@@ -3,8 +3,8 @@ import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
-import { ApiTags, ApiOperation, ApiBody, ApiResponse } from '@nestjs/swagger';
-import { UserDto } from './dto/user.dto';
+import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { UserDto, RegisterDto } from './dto/user.dto';
 import { CurrentUser, JwtUser } from './current-user.decorator';
 
 @ApiTags('Auth')
@@ -12,23 +12,58 @@ import { CurrentUser, JwtUser } from './current-user.decorator';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  @UseGuards(LocalAuthGuard)
-  @Post('login')
-  @ApiOperation({ summary: 'User login, returns JWT' })
-  @ApiBody({ type: LoginDto })
-  @ApiResponse({ status: 201, description: 'JWT access token', schema: { example: { access_token: 'jwt.token.here' } } })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async login(@CurrentUser() user: JwtUser, @Body() _body: LoginDto) {
-    return this.authService.login(user);
+  @Post('register')
+  @ApiOperation({ summary: 'Register new user' })
+  @ApiBody({ type: RegisterDto })
+  @ApiResponse({ 
+    status: 201, 
+    description: 'User registered successfully', 
+    schema: { 
+      example: { 
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          id: 'uuid',
+          username: 'john_doe',
+          role: 'user'
+        }
+      } 
+    } 
+  })
+  @ApiResponse({ status: 409, description: 'Username already exists' })
+  async register(@Body() registerDto: RegisterDto) {
+    return this.authService.register(registerDto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Post('login')
+  @ApiOperation({ summary: 'Login user' })
+  @ApiBody({ type: LoginDto })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Login successful', 
+    schema: { 
+      example: { 
+        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          id: 'uuid',
+          username: 'john_doe',
+          role: 'user'
+        }
+      } 
+    } 
+  })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
+  }
+
   @Get('me')
-  @ApiOperation({ summary: 'Get current user info' })
-  @ApiResponse({ status: 200, type: UserDto })
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile', type: UserDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getMe(@CurrentUser() user: JwtUser) {
-    return this.authService.getMe(user.userId);
+  async getProfile(@CurrentUser() user: JwtUser) {
+    return this.authService.getProfile(user);
   }
 
   @UseGuards(JwtAuthGuard)

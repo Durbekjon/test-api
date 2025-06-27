@@ -6,6 +6,7 @@ import * as PDFDocument from 'pdfkit';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ExcelJS from 'exceljs';
+import { CoverSheetService } from './cover-sheet.service';
 
 @Injectable()
 export class TestsService {
@@ -120,8 +121,24 @@ export class TestsService {
         if (settings.shuffle_answers) questions.forEach((q: any) => { q.answers = this.shuffleArray(q.answers); });
       }
       const variantId = uuidv4();
-      const filePath = path.join(outputDir, `${variantId}.pdf`);
-      await this.createPdfVariant(filePath, variantId, test.name, questions);
+      // Yangi structure tuzish (PDF uchun faqat text va options)
+      const variantStructure = {
+        id: variantId,
+        questions: questions.map((q: any) => ({
+          text: q.text,
+          options: q.answers.map((a: any) => ({ text: a.text }))
+        }))
+      };
+      // To'liq savollar tuzilmasi (scoring uchun)
+      const variantQuestions = questions.map((q: any) => ({
+        text: q.text,
+        options: q.answers.map((a: any) => ({ text: a.text, isCorrect: a.isCorrect }))
+      }));
+      // PDF generatsiyasi
+      const filePath = await CoverSheetService.generateCover({
+        title: test.name,
+        variant: { id: variantId, structure: variantStructure }
+      });
       // Store variant metadata
       await this.prisma.testVariant.create({
         data: {
@@ -129,6 +146,7 @@ export class TestsService {
           testId,
           settings,
           filePath,
+          questions: variantQuestions,
         },
       });
       variants.push({ variantId, filePath });
@@ -156,9 +174,22 @@ export class TestsService {
       doc.text('Bubbles:', { align: 'center' });
       // Mock 20 round bubbles (or based on number of questions)
       const bubbleCount = Math.max(questions.length, 20);
-      for (let i = 1; i <= bubbleCount; i++) {
-        doc.circle(50 + (i - 1) * 25, 200, 10).stroke();
-        doc.text(i.toString(), 45 + (i - 1) * 25, 215, { width: 20, align: 'center' });
+      const maxPerCol = 10;
+      const bubbleRadius = 10;
+      const bubbleSpacingY = 30;
+      const bubbleSpacingX = 40;
+      const startX = 70;
+      const startY = 200;
+      const numCols = Math.ceil(bubbleCount / maxPerCol);
+      for (let col = 0; col < numCols; col++) {
+        const bubblesInCol = Math.min(maxPerCol, bubbleCount - col * maxPerCol);
+        for (let row = 0; row < bubblesInCol; row++) {
+          const idx = col * maxPerCol + row + 1;
+          const x = startX + col * bubbleSpacingX;
+          const y = startY + row * bubbleSpacingY;
+          doc.circle(x, y, bubbleRadius).stroke();
+          doc.text(idx.toString(), x - 25, y - 7, { width: 20, align: 'right' });
+        }
       }
       doc.addPage();
       // Questions
@@ -182,84 +213,203 @@ export class TestsService {
       include: { questions: { include: { answers: true } } },
     });
     if (!test) throw new Error('Test not found');
+    
     let correctCount = 0;
-    const incorrect: { questionId: string; correctAnswer: { id: string; text: string } | null }[] = [];
-    for (const q of test.questions as { id: string; answers: { id: string; text: string; isCorrect: boolean }[] }[]) {
+    const breakdown = test.questions.map((q: { id: string; answers: { id: string; text: string; isCorrect: boolean }[] }) => {
       const submitted = answers.find((a: { questionId: string; answerIds: string[] }) => a.questionId === q.id);
       const correctAnswer = q.answers.find((a: { isCorrect: boolean }) => a.isCorrect);
+      
       if (!correctAnswer) {
-        incorrect.push({ questionId: q.id, correctAnswer: null });
-        continue;
+        return {
+          questionId: q.id,
+          selected: submitted?.answerIds || [],
+          correct: null,
+          isCorrect: false,
+          status: 'invalid'
+        };
       }
+
       const isCorrect = submitted && submitted.answerIds.includes(correctAnswer.id) && submitted.answerIds.length === 1;
       if (isCorrect) {
         correctCount++;
-      } else {
-        incorrect.push({
-          questionId: q.id,
-          correctAnswer: { id: correctAnswer.id, text: correctAnswer.text },
-        });
       }
-    }
+
+      return {
+        questionId: q.id,
+        selected: submitted?.answerIds || [],
+        correct: { id: correctAnswer.id, text: correctAnswer.text },
+        isCorrect,
+        status: isCorrect ? 'correct' : (submitted ? 'incorrect' : 'unanswered')
+      };
+    });
+
     // Store submission
     await this.prisma.testSubmission.create({
       data: {
         userId,
         testId,
-        answers,
+        answers: breakdown,
         correctCount,
-        incorrect,
+        totalCount: test.questions.length,
       },
     });
-    return { correctCount, incorrect };
+
+    return { correctCount, totalCount: test.questions.length, breakdown };
   }
 
   async exportSubmissionsExcel(testId: string) {
     const submissions = await this.prisma.testSubmission.findMany({
       where: { testId },
-      orderBy: { createdAt: 'asc' },
+      include: {
+        user: true,
+        variant: true
+      },
+      orderBy: { createdAt: 'desc' }
     });
+
     const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet('Submissions');
-    sheet.columns = [
-      { header: 'User ID', key: 'userId', width: 36 },
-      { header: 'Correct Count', key: 'correctCount', width: 15 },
-      { header: 'Incorrect Question IDs', key: 'incorrect', width: 40 },
-      { header: 'Timestamp', key: 'createdAt', width: 24 },
+    const worksheet = workbook.addWorksheet('Submissions');
+
+    worksheet.columns = [
+      { header: 'ID', key: 'id', width: 36 },
+      { header: 'User', key: 'username', width: 20 },
+      { header: 'Variant', key: 'variantId', width: 36 },
+      { header: 'Score', key: 'score', width: 10 },
+      { header: 'Total', key: 'total', width: 10 },
+      { header: 'Percentage', key: 'percentage', width: 10 },
+      { header: 'Date', key: 'date', width: 20 }
     ];
-    submissions.forEach(sub => {
-      sheet.addRow({
-        userId: sub.userId || '',
-        correctCount: sub.correctCount,
-        incorrect: Array.isArray(sub.incorrect) ? sub.incorrect.map((i: { questionId: string }) => i.questionId).join(', ') : '',
-        createdAt: sub.createdAt.toISOString(),
+
+    submissions.forEach(submission => {
+      worksheet.addRow({
+        id: submission.id,
+        username: submission.user?.username || 'Anonymous',
+        variantId: submission.variantId || 'N/A',
+        score: submission.correctCount,
+        total: submission.totalCount,
+        percentage: `${((submission.correctCount / submission.totalCount) * 100).toFixed(1)}%`,
+        date: submission.createdAt.toLocaleString()
       });
     });
-    const outputDir = require('path').join(process.cwd(), 'exports');
-    if (!require('fs').existsSync(outputDir)) require('fs').mkdirSync(outputDir);
-    const filePath = require('path').join(outputDir, `test-${testId}-submissions.xlsx`);
+
+    const filePath = path.join(process.cwd(), 'generated', `submissions-${testId}-${Date.now()}.xlsx`);
     await workbook.xlsx.writeFile(filePath);
     return filePath;
   }
 
   async listSubmissions(testId: string, page = 1, limit = 20) {
-    const totalCount = await this.prisma.testSubmission.count({ where: { testId } });
-    const totalPages = Math.ceil(totalCount / limit);
-    const results = await this.prisma.testSubmission.findMany({
+    const skip = (page - 1) * limit;
+    return this.prisma.testSubmission.findMany({
       where: { testId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            role: true
+          }
+        },
+        variant: {
+          select: {
+            id: true,
+            filePath: true
+          }
+        }
+      },
       orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip,
+      take: limit
     });
-    return { totalCount, currentPage: page, totalPages, results };
   }
 
   async getSubmission(id: string, userId: string, userRole: string) {
-    const submission = await this.prisma.testSubmission.findUnique({ where: { id } });
-    if (!submission) return null;
-    if (userRole !== 'admin' && submission.userId !== userId) {
-      throw new ForbiddenException('You do not have access to this submission');
+    const submission = await this.prisma.testSubmission.findUnique({
+      where: { id },
+      include: {
+        test: true,
+        variant: true,
+        user: true
+      }
+    });
+
+    if (!submission) {
+      throw new BadRequestException('Submission not found');
     }
-    return submission;
+
+    // Only allow admin or the user who submitted to view
+    if (userRole !== 'admin' && submission.userId !== userId) {
+      throw new ForbiddenException('Not authorized to view this submission');
+    }
+
+    return {
+      id: submission.id,
+      testId: submission.testId,
+      variantId: submission.variantId,
+      userId: submission.userId,
+      correctCount: submission.correctCount,
+      totalCount: submission.totalCount,
+      answers: submission.answers,
+      metadata: submission.metadata,
+      createdAt: submission.createdAt,
+      test: {
+        id: submission.test.id,
+        name: submission.test.name
+      },
+      variant: submission.variant ? {
+        id: submission.variant.id,
+        filePath: submission.variant.filePath
+      } : null,
+      user: submission.user ? {
+        id: submission.user.id,
+        username: submission.user.username,
+        role: submission.user.role
+      } : null
+    };
+  }
+
+  async getTestWithQuestions(id: string) {
+    return this.prisma.test.findUnique({
+      where: { id },
+      include: { questions: { include: { answers: true } } },
+    });
+  }
+
+  async getVariantWithQuestions(variantId: string) {
+    const variant = await this.prisma.testVariant.findUnique({
+      where: { id: variantId },
+      select: { id: true, settings: true, questions: true },
+    });
+    console.log(variant);
+    if (!variant || !variant.settings) {
+      console.warn('[TestsService] Variant or settings missing for', variantId);
+      return null;
+    }
+    let structure = null;
+    try {
+      structure = typeof variant.settings === 'string' ? JSON.parse(variant.settings) : variant.settings;
+    } catch (e) {
+      console.warn('[TestsService] Failed to parse settings JSON:', e);
+      return null;
+    }
+    return { id: variant.id, structure, questions: variant.questions };
+  }
+
+  async saveSubmission(testId: string, variantId: string, userId: string, result: any) {
+    const metadata = result.warning || result.debugOverlayPath ? {
+      warning: result.warning,
+      debugOverlayPath: result.debugOverlayPath
+    } : undefined;
+
+    return this.prisma.testSubmission.create({
+      data: {
+        testId,
+        variantId,
+        userId,
+        answers: result.breakdown,
+        correctCount: result.score,
+        totalCount: result.total,
+        metadata
+      }
+    });
   }
 }

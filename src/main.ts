@@ -12,6 +12,17 @@ async function bootstrap() {
     .setTitle('Testing System API')
     .setDescription('API for test management and generation')
     .setVersion('1.0')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token',
+        in: 'header',
+      },
+      'access-token', // This name here is important for references in @ApiBearerAuth() decorator
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);

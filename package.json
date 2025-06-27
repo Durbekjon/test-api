@@ -8,16 +8,16 @@
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 nest start",
+    "start:dev": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 nest start --watch",
+    "start:debug": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 nest start --debug --watch",
+    "start:prod": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 jest",
+    "test:watch": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 jest --watch",
+    "test:cov": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 jest --coverage",
+    "test:debug": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:e2e": "OPENCV4NODEJS_DISABLE_AUTOBUILD=1 OPENCV_LIB_DIR=/opt/homebrew/lib OPENCV_INCLUDE_DIR=/opt/homebrew/include/opencv4 jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -28,6 +28,7 @@
     "@nestjs/platform-express": "^11.1.3",
     "@nestjs/swagger": "^11.2.0",
     "@prisma/client": "^6.10.1",
+    "@u4/opencv4nodejs": "^7.1.2",
     "bcryptjs": "^3.0.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
@@ -37,10 +38,12 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "passport-local": "^1.0.0",
+    "pdf-lib": "^1.17.1",
     "pdfkit": "^0.17.1",
     "prisma": "^6.10.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "sharp": "^0.34.2",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0"
   },
@@ -59,6 +62,7 @@
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "@types/pdfkit": "^0.14.0",
+    "@types/sharp": "^0.31.1",
     "@types/supertest": "^6.0.3",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
@@ -91,5 +95,11 @@
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
+  },
+  "opencv4nodejs": {
+    "disableAutoBuild": 1,
+    "opencvIncludeDir": "/opt/homebrew/include/opencv4",
+    "opencvLibDir": "/opt/homebrew/lib",
+    "opencvBinDir": "/opt/homebrew/bin"
   }
 }
