@@ -46,7 +46,8 @@
     "rxjs": "^7.8.1",
     "sharp": "^0.34.2",
     "swagger-ui-express": "^5.0.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "@u4/opencv4nodejs": "^7.0.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
@@ -99,11 +100,8 @@
   },
   "opencv4nodejs": {
     "disableAutoBuild": 1,
-    "opencvIncludeDir": "/opt/homebrew/include/opencv4",
-    "opencvLibDir": "/opt/homebrew/lib",
-    "opencvBinDir": "/opt/homebrew/bin"
-  },
-  "optionalDependencies": {
-    "@u4/opencv4nodejs": "^7.0.0"
+    "opencvIncludeDir": "/usr/local/include/opencv4",
+    "opencvLibDir": "/usr/local/lib",
+    "opencvBinDir": "/usr/local/bin"
   }
 }

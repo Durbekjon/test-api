@@ -74,7 +74,7 @@ export class TestsController {
   @ApiOperation({ summary: 'Generate randomized test variants (Admin only)' })
   @ApiParam({ name: 'id', type: 'string', description: 'ID of the test' })
   @ApiBody({ type: GenerateDto })
-  @ApiResponse({ status: 201, description: 'List of generated variants', schema: { example: { variants: [{ variantId: 'uuid', pdfFilePath: '/public/generated/uuid.pdf', docxFilePath: '/public/generated/uuid.docx' }] } } })
+  @ApiResponse({ status: 201, description: 'List of generated variants', schema: { example: { variants: [{ variantId: 'uuid', pdfFilePath: '/public/generated/uuid.pdf', docxFilePath: '/ed/uuid.docx' }] } } })
   @ApiResponse({ status: 404, description: 'Test not found' })
   async generate(@Param('id') id: string, @Body() body: GenerateDto, @CurrentUser() user: JwtUser) {
     if (!body.copies || body.copies < 1) throw new BadRequestException('Copies must be a positive number');
