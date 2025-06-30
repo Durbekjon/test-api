@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as ExcelJS from 'exceljs';
 import { CoverSheetService } from './cover-sheet.service';
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx';
 
 @Injectable()
 export class TestsService {
@@ -15,7 +16,7 @@ export class TestsService {
   async parseDocx(buffer: Buffer) {
     const { value } = await mammoth.extractRawText({ buffer });
     const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-    const questions = [];
+    const questions: { question: string; answers: { text: string; isCorrect: boolean }[] }[] = [];
     let currentQuestion: { text: string; answers: { text: string; isCorrect: boolean }[]; correctAnswers: number } | null = null;
     for (const line of lines) {
       if (line.startsWith('?')) {
@@ -95,6 +96,111 @@ export class TestsService {
     });
   }
 
+  async generateDocxVariant(filePath: string, variantId: string, testName: string, questions: any[]) {
+    // Title and UUID
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              text: testName,
+              heading: 'Title',
+              alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({
+              text: `Variant UUID: ${variantId}`,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              text: 'Answer Bubbles:',
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 200 },
+            }),
+            // Bubble grid (table)
+            this.createBubbleGridTable(questions),
+            new Paragraph({
+              text: '',
+              spacing: { after: 400 },
+            }),
+            // Questions and answers
+            ...questions.map((q: any, idx: number) => [
+              new Paragraph({
+                text: `${idx + 1}. ${q.text}`,
+                spacing: { after: 100 },
+              }),
+              ...q.answers.map((a: any, aidx: number) =>
+                new Paragraph({
+                  text: `   ${String.fromCharCode(65 + aidx)}. ${a.text}`,
+                  spacing: { after: 50 },
+                })
+              ),
+              new Paragraph(''),
+            ]).flat(),
+          ],
+        },
+      ],
+    });
+    const buffer = await Packer.toBuffer(doc);
+    await fs.promises.writeFile(filePath, buffer);
+  }
+
+  createBubbleGridTable(questions: any[]) {
+    // At least 20 bubbles, or as many as questions
+    const bubbleCount = Math.max(questions.length, 20);
+    const maxPerCol = 10;
+    const numCols = Math.ceil(bubbleCount / maxPerCol);
+    const rows: TableRow[] = [];
+    // Header row (A, B, C, ...)
+    const maxOptions = Math.max(...questions.map(q => q.answers.length));
+    const headerCells = [
+      new TableCell({
+        children: [new Paragraph('Q#')],
+        width: { size: 1000, type: WidthType.DXA },
+      }),
+      ...Array.from({ length: maxOptions }, (_, i) =>
+        new TableCell({
+          children: [new Paragraph(String.fromCharCode(65 + i))],
+          width: { size: 1000, type: WidthType.DXA },
+        })
+      ),
+    ];
+    rows.push(new TableRow({ children: headerCells }));
+    // Bubble rows
+    for (let i = 0; i < bubbleCount; i++) {
+      const qNum = i + 1;
+      const q = questions[i];
+      rows.push(
+        new TableRow({
+          children: [
+            new TableCell({
+              children: [new Paragraph(qNum.toString())],
+              width: { size: 1000, type: WidthType.DXA },
+            }),
+            ...Array.from({ length: maxOptions }, (_, j) =>
+              new TableCell({
+                children: [new Paragraph('○')],
+                width: { size: 1000, type: WidthType.DXA },
+                borders: {
+                  top: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
+                  bottom: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
+                  left: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
+                  right: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
+                },
+              })
+            ),
+          ],
+        })
+      );
+    }
+    return new Table({
+      rows,
+      width: { size: 100 * numCols, type: WidthType.PERCENTAGE },
+      alignment: AlignmentType.CENTER,
+    });
+  }
+
   async generateVariants(testId: string, copies: number) {
     // Fetch test, questions, answers, and settings
     const test = await this.prisma.test.findUnique({
@@ -106,7 +212,7 @@ export class TestsService {
     });
     if (!test) throw new Error('Test not found');
     const settings = test.testSettings || { shuffle_questions: false, shuffle_answers: false, shuffle_all: false };
-    const variants = [];
+    const variants: { variantId: string; pdfFilePath: string; docxFilePath: string }[] = [];
     const outputDir = path.join(process.cwd(), 'public/generated');
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
     for (let i = 0; i < copies; i++) {
@@ -135,21 +241,24 @@ export class TestsService {
         options: q.answers.map((a: any) => ({ text: a.text, isCorrect: a.isCorrect }))
       }));
       // PDF generatsiyasi
-      const filePath = await CoverSheetService.generateCover({
+      const pdfFilePath = await CoverSheetService.generateCover({
         title: test.name,
         variant: { id: variantId, structure: variantStructure }
       });
+      // DOCX generatsiyasi
+      const docxFilePath = path.join(outputDir, `${variantId}.docx`);
+      await this.generateDocxVariant(docxFilePath, variantId, test.name, questions);
       // Store variant metadata
       await this.prisma.testVariant.create({
         data: {
           id: variantId,
           testId,
           settings,
-          filePath,
+          filePath: pdfFilePath,
           questions: variantQuestions,
         },
       });
-      variants.push({ variantId, filePath });
+      variants.push({ variantId, pdfFilePath, docxFilePath });
     }
     return variants;
   }

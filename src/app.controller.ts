@@ -14,4 +14,9 @@ export class AppController {
   getPing() {
     return { message: 'pong' };
   }
+
+  @Get('health')
+  getHealth() {
+    return { status: 'ok' };
+  }
 }

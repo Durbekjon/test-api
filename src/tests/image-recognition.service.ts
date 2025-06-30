@@ -1,4 +1,11 @@
-import * as cv from '@u4/opencv4nodejs';
+let cv: any = null;
+try {
+  // @ts-ignore
+  cv = require('@u4/opencv4nodejs');
+} catch (e) {
+  cv = null;
+  console.warn('[WARN] OpenCV module @u4/opencv4nodejs not available. Image recognition features will be disabled.');
+}
 import * as sharp from 'sharp';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -34,7 +41,7 @@ export interface BubbleResult {
 
 type Bubble = {
   idx: number;
-  cnt: cv.Contour;
+  cnt: any;
   area: number;
   center: { x: number; y: number };
   bbox: { x: number; y: number; width: number; height: number };
@@ -53,6 +60,9 @@ export class ImageRecognitionService {
     image: Buffer,
     options: BubbleDetectionOptions
   ): Promise<BubbleResult> {
+    if (!cv) {
+      throw new Error('OpenCV module is not available. This feature is disabled in this deployment.');
+    }
     const {
       bubbleCount,
       optionsPerQuestion = ImageRecognitionService.OPTIONS_PER_QUESTION,
@@ -365,8 +375,8 @@ export class ImageRecognitionService {
       // Draw circle
       const color = marked.includes(i + 1) ? black : white;
       const center = new cv.Point2(x + bubbleSize/2, y + bubbleSize/2);
-      mat.drawCircle(center, bubbleSize/2, color as cv.Vec3, cv.LINE_8);
-      mat.drawCircle(center, bubbleSize/2, black as cv.Vec3, cv.LINE_8);
+      mat.drawCircle(center, bubbleSize/2, color as any, cv.LINE_8);
+      mat.drawCircle(center, bubbleSize/2, black as any, cv.LINE_8);
     }
     
     // Convert to buffer
@@ -397,7 +407,7 @@ export class ImageRecognitionService {
   }
 
   private static async saveDebugOverlay(
-    mat: cv.Mat,
+    mat: any,
     bubbles: Bubble[],
     marked: number[],
     outPath: string

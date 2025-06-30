@@ -74,7 +74,7 @@ export class TestsController {
   @ApiOperation({ summary: 'Generate randomized test variants (Admin only)' })
   @ApiParam({ name: 'id', type: 'string', description: 'ID of the test' })
   @ApiBody({ type: GenerateDto })
-  @ApiResponse({ status: 201, description: 'List of generated variants', schema: { example: { variants: [{ variantId: 'uuid', filePath: '/public/generated/uuid.pdf' }] } } })
+  @ApiResponse({ status: 201, description: 'List of generated variants', schema: { example: { variants: [{ variantId: 'uuid', pdfFilePath: '/public/generated/uuid.pdf', docxFilePath: '/public/generated/uuid.docx' }] } } })
   @ApiResponse({ status: 404, description: 'Test not found' })
   async generate(@Param('id') id: string, @Body() body: GenerateDto, @CurrentUser() user: JwtUser) {
     if (!body.copies || body.copies < 1) throw new BadRequestException('Copies must be a positive number');
@@ -102,16 +102,15 @@ export class TestsController {
   async submit(@Param('id') id: string, @UploadedFile() file: Express.Multer.File, @Body() body: any, @CurrentUser() user: JwtUser) {
     const { variantId, answers } = body;
     if (!variantId) throw new BadRequestException('variantId is required');
-    
     // Fetch variant with structure and questions
-    const variant = await this.testsService.getVariantWithQuestions(variantId);
+    const variant: { id: string; structure: any; questions: any } | null = await this.testsService.getVariantWithQuestions(variantId);
     if (!variant || !variant.structure || !Array.isArray(variant.questions)) {
       throw new BadRequestException('Variant structure or questions missing or invalid');
     }
+    const questions: any[] = Array.isArray(variant.questions) ? variant.questions : [];
 
     if (file) {
       // Process image submission
-      const questions: any[] = variant.questions || variant.structure.questions;
       const columnCount = 3;
       const bubbleMap = ImageRecognitionService.buildBubbleMap(questions, columnCount);
       
