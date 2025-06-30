@@ -25,9 +25,5 @@ export class RegisterDto {
   @MinLength(6)
   password: string;
 
-  @ApiProperty({ example: 'user', description: 'Role (admin or user)', enum: ['admin', 'user'] })
-  @IsString()
-  @IsNotEmpty()
-  @IsIn(['admin', 'user'])
-  role: string;
+  role: string = 'admin';
 } 

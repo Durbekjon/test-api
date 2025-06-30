@@ -1,11 +1,12 @@
 import { Controller, Post, UseGuards, Request, Body, Get, Req, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LocalAuthGuard } from './local-auth.guard';
+// import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { UserDto, RegisterDto } from './dto/user.dto';
 import { CurrentUser, JwtUser } from './current-user.decorator';
+import { Roles } from './roles.decorator';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -17,18 +18,19 @@ export class AuthController {
   @ApiBody({ type: RegisterDto })
   @ApiResponse({ 
     status: 201, 
-    description: 'User registered successfully', 
+    description: 'Admin registered successfully', 
     schema: { 
       example: { 
         access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 'uuid',
           username: 'john_doe',
-          role: 'user'
+          role: 'admin'
         }
       } 
     } 
   })
+    
   @ApiResponse({ status: 409, description: 'Username already exists' })
   async register(@Body() registerDto: RegisterDto) {
     return this.authService.register(registerDto);
@@ -54,6 +56,17 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto);
+  }
+
+  @Post('user')
+  @UseGuards(JwtAuthGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Create new user' })
+  @ApiBody({ type: RegisterDto })
+  @ApiResponse({ status: 201, description: 'User created successfully', schema: { example: { id: 'uuid', username: 'john_doe', role: 'user' } } })
+  @ApiResponse({ status: 409, description: 'Username already exists' })
+  async createUser(@Body() registerDto: RegisterDto) {
+    return this.authService.createUser(registerDto);
   }
 
   @Get('me')

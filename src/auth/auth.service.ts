@@ -48,6 +48,11 @@ export class AuthService {
     };
   }
 
+  async createUser(registerDto: RegisterDto) {
+    registerDto.role = 'user';
+    return this.register(registerDto);
+  }
+
   async login(loginDto: LoginDto) {
     // Find user
     const user = await this.prisma.user.findUnique({
