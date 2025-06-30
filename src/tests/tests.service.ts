@@ -13,7 +13,7 @@ import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, Width
 export class TestsService {
   constructor(private prisma: PrismaService) {}
 
-  async parseDocx(buffer: Buffer) {
+  async parseDocx(buffer: Buffer): Promise<{ questions: { question: string; answers: { text: string; isCorrect: boolean }[] }[] }> {
     const { value } = await mammoth.extractRawText({ buffer });
     const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     const questions: { question: string; answers: { text: string; isCorrect: boolean }[] }[] = [];
@@ -201,7 +201,7 @@ export class TestsService {
     });
   }
 
-  async generateVariants(testId: string, copies: number) {
+  async generateVariants(testId: string, copies: number): Promise<{ variantId: string; pdfFilePath: string; docxFilePath: string }[]> {
     // Fetch test, questions, answers, and settings
     const test = await this.prisma.test.findUnique({
       where: { id: testId },
