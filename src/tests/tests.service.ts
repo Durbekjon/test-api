@@ -246,7 +246,8 @@ export class TestsService {
         variant: { id: variantId, structure: variantStructure }
       });
       // DOCX generatsiyasi
-      const docxFilePath = path.join(outputDir, `${variantId}.docx`);
+      const docxFileName = `${variantId}.docx`;
+      const docxFilePath = path.join(outputDir, docxFileName);
       await this.generateDocxVariant(docxFilePath, variantId, test.name, questions);
       // Store variant metadata
       await this.prisma.testVariant.create({
@@ -258,7 +259,7 @@ export class TestsService {
           questions: variantQuestions,
         },
       });
-      variants.push({ variantId, pdfFilePath, docxFilePath });
+      variants.push({ variantId, pdfFilePath, docxFilePath: `/public/generated/${docxFileName}` });
     }
     return variants;
   }
@@ -401,9 +402,11 @@ export class TestsService {
       });
     });
 
-    const filePath = path.join(process.cwd(), 'public', 'generated', `submissions-${testId}-${Date.now()}.xlsx`);
+    const fileName = `submissions-${testId}-${Date.now()}.xlsx`;
+    const filePath = path.join(process.cwd(), 'public', 'generated', fileName);
     await workbook.xlsx.writeFile(filePath);
-    return filePath;
+    // Return public URL
+    return `/public/generated/${fileName}`;
   }
 
   async listSubmissions(testId: string, page = 1, limit = 20) {

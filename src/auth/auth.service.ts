@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
@@ -15,6 +15,9 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto) {
+    if (registerDto.role !== 'admin' && registerDto.role !== 'user') {
+      throw new BadRequestException('Invalid role');
+    }
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { username: registerDto.username },

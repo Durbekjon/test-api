@@ -33,6 +33,7 @@ export class AuthController {
     
   @ApiResponse({ status: 409, description: 'Username already exists' })
   async register(@Body() registerDto: RegisterDto) {
+    registerDto.role = 'admin';
     return this.authService.register(registerDto);
   }
 
@@ -60,6 +61,7 @@ export class AuthController {
 
   @Post('user')
   @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
   @Roles('admin')
   @ApiOperation({ summary: 'Create new user' })
   @ApiBody({ type: RegisterDto })

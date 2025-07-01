@@ -81,7 +81,9 @@ export class CoverSheetService {
       const filePath = path.join(outputDir, `${uuid}.pdf`);
       const pdfBytes = await pdfDoc.save();
       fs.writeFileSync(filePath, pdfBytes);
-      return filePath;
+      // Return public URL
+      const publicUrl = `/public/tests/${uuid}.pdf`;
+      return publicUrl;
     }
 
     // BUBBLE GRID: enforce 30 questions per page
@@ -300,6 +302,8 @@ export class CoverSheetService {
     const filePath = path.join(outputDir, `${uuid}.pdf`);
     const pdfBytes = await pdfDoc.save();
     fs.writeFileSync(filePath, pdfBytes);
-    return filePath;
+    // Return public URL
+    const publicUrl = `/public/tests/${uuid}.pdf`;
+    return publicUrl;
   }
 } 

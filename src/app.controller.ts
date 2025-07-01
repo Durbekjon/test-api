@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Delete, Get } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -18,5 +18,10 @@ export class AppController {
   @Get('health')
   getHealth() {
     return { status: 'ok' };
+  }
+
+  @Delete('cleanup-db')
+  async cleanupDb() {
+    return this.appService.cleanupDb();
   }
 }
