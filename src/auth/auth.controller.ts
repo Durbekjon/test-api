@@ -73,22 +73,6 @@ export class AuthController {
     return this.authService.login(loginDto);
   }
 
-  @Post('user')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('access-token')
-  @Roles('admin')
-  @ApiOperation({ summary: 'Create new user' })
-  @ApiBody({ type: RegisterDto })
-  @ApiResponse({
-    status: 201,
-    description: 'User created successfully',
-    schema: { example: { id: 'uuid', username: 'john_doe', role: 'user' } },
-  })
-  @ApiResponse({ status: 409, description: 'Username already exists' })
-  async createUser(@Body() registerDto: RegisterDto) {
-    return this.authService.createUser(registerDto);
-  }
-
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

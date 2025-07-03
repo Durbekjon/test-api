@@ -572,8 +572,8 @@ export class TestsService {
     const fileName = `submissions-${testId}-${Date.now()}.xlsx`;
     const filePath = path.join(process.cwd(), 'public', 'generated', fileName);
     await workbook.xlsx.writeFile(filePath);
-    // Return public URL
-    return `/public/generated/${fileName}`;
+    // Return both absolute file path and public URL
+    return { filePath, publicUrl: `/public/generated/${fileName}` };
   }
 
   async listSubmissions(testId: string, page = 1, limit = 20) {
@@ -705,5 +705,62 @@ export class TestsService {
         metadata,
       },
     });
+  }
+
+  async updateTestName(testId: string, name: string) {
+    const test = await this.prisma.test.findUnique({ where: { id: testId } });
+    if (!test) throw new BadRequestException('Test not found');
+    return this.prisma.test.update({ where: { id: testId }, data: { name } });
+  }
+
+  async deleteTestWithFiles(testId: string) {
+    // Find all variants and their files
+    const variants = await this.prisma.testVariant.findMany({
+      where: { testId },
+    });
+    // Delete files for each variant
+    for (const variant of variants) {
+      // PDF file
+      if (variant.filePath) {
+        const absPath = variant.filePath.startsWith('/')
+          ? path.join(process.cwd(), variant.filePath)
+          : variant.filePath;
+        try {
+          if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
+        } catch {}
+      }
+      // DOCX file (if present)
+      const docxPath = path.join(
+        process.cwd(),
+        'public/generated',
+        `${variant.id}.docx`,
+      );
+      try {
+        if (fs.existsSync(docxPath)) fs.unlinkSync(docxPath);
+      } catch {}
+    }
+    // Delete Excel exports for this test
+    const generatedDir = path.join(process.cwd(), 'public/generated');
+    if (fs.existsSync(generatedDir)) {
+      const files = fs.readdirSync(generatedDir);
+      for (const file of files) {
+        if (
+          file.startsWith(`submissions-${testId}-`) &&
+          file.endsWith('.xlsx')
+        ) {
+          try {
+            fs.unlinkSync(path.join(generatedDir, file));
+          } catch {}
+        }
+      }
+    }
+    // Delete submissions, variants, questions, answers, settings (cascades if FK is set)
+    await this.prisma.testSubmission.deleteMany({ where: { testId } });
+    await this.prisma.testVariant.deleteMany({ where: { testId } });
+    await this.prisma.question.deleteMany({ where: { testId } });
+    await this.prisma.testSettings.deleteMany({ where: { testId } });
+    // Delete the test itself
+    await this.prisma.test.delete({ where: { id: testId } });
+    return { deleted: true };
   }
 }

@@ -10,6 +10,8 @@ import {
   Res,
   UseGuards,
   UseInterceptors,
+  Put,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -394,7 +396,7 @@ export class TestsController {
     @Res() res: Response,
     @CurrentUser() user: JwtUser,
   ) {
-    const filePath = await this.testsService.exportSubmissionsExcel(id);
+    const { filePath } = await this.testsService.exportSubmissionsExcel(id);
     return res.download(filePath);
   }
 
@@ -438,6 +440,34 @@ export class TestsController {
   @ApiResponse({ status: 404, description: 'Submission not found' })
   async getSubmission(@Param('id') id: string, @CurrentUser() user: JwtUser) {
     return this.testsService.getSubmission(id, user.userId, user.role);
+  }
+
+  @Put(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: "Update a test's name (Admin only)" })
+  @ApiParam({ name: 'id', type: 'string', description: 'ID of the test' })
+  @ApiBody({ schema: { properties: { name: { type: 'string' } } } })
+  @ApiResponse({ status: 200, description: 'Test updated' })
+  @ApiResponse({ status: 404, description: 'Test not found' })
+  async updateTestName(
+    @Param('id') id: string,
+    @Body() body: { name: string },
+  ) {
+    return this.testsService.updateTestName(id, body.name);
+  }
+
+  @Delete(':id')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  @ApiOperation({
+    summary: 'Delete a test and all its files/variants (Admin only)',
+  })
+  @ApiParam({ name: 'id', type: 'string', description: 'ID of the test' })
+  @ApiResponse({ status: 200, description: 'Test deleted' })
+  @ApiResponse({ status: 404, description: 'Test not found' })
+  async deleteTest(@Param('id') id: string) {
+    return this.testsService.deleteTestWithFiles(id);
   }
 }
 
