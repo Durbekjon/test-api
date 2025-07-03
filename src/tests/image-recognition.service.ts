@@ -1,10 +1,11 @@
 let cv: any = null;
 try {
-  // @ts-ignore
   cv = require('@u4/opencv4nodejs');
 } catch (e) {
   cv = null;
-  console.warn('[WARN] OpenCV module @u4/opencv4nodejs not available. Image recognition features will be disabled.');
+  console.warn(
+    '[WARN] OpenCV module @u4/opencv4nodejs not available. Image recognition features will be disabled.',
+  );
 }
 import * as sharp from 'sharp';
 import * as path from 'path';
@@ -24,9 +25,9 @@ export interface BubbleDetectionOptions {
 
 export interface BubbleResult {
   marked: number[]; // global bubble indices
-  perQuestion: { 
-    question: number; 
-    selected: string[] // Changed from number[] to string[] for letter options
+  perQuestion: {
+    question: number;
+    selected: string[]; // Changed from number[] to string[] for letter options
   }[];
   debugOverlayPath?: string;
   warning?: string;
@@ -58,10 +59,12 @@ export class ImageRecognitionService {
 
   static async analyzeCoverImage(
     image: Buffer,
-    options: BubbleDetectionOptions
+    options: BubbleDetectionOptions,
   ): Promise<BubbleResult> {
     if (!cv) {
-      throw new Error('OpenCV module is not available. This feature is disabled in this deployment.');
+      throw new Error(
+        'OpenCV module is not available. This feature is disabled in this deployment.',
+      );
     }
     const {
       bubbleCount,
@@ -89,13 +92,13 @@ export class ImageRecognitionService {
       cv.ADAPTIVE_THRESH_GAUSSIAN_C,
       cv.THRESH_BINARY_INV,
       21,
-      10
+      10,
     );
 
     // 3. Find contours (potential bubbles)
     const contours = binary.findContours(
       cv.RETR_EXTERNAL,
-      cv.CHAIN_APPROX_SIMPLE
+      cv.CHAIN_APPROX_SIMPLE,
     );
 
     // 4. Filter contours by area/circularity
@@ -129,11 +132,11 @@ export class ImageRecognitionService {
       width: meta.width,
       height: meta.height,
       columnWidth,
-      rowHeight
+      rowHeight,
     });
 
     // First, assign column and rough position to each bubble
-    bubbles.forEach(bubble => {
+    bubbles.forEach((bubble) => {
       const colIdx = Math.floor(bubble.center.x / columnWidth);
       const rowIdx = Math.floor(bubble.center.y / rowHeight);
       bubble.colIdx = colIdx;
@@ -141,12 +144,15 @@ export class ImageRecognitionService {
     });
 
     // Validate bubble assignments
-    const bubbleAssignments = bubbles.reduce((acc, bubble) => {
-      const key = `col${bubble.colIdx}row${bubble.rowIdx}`;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-    
+    const bubbleAssignments = bubbles.reduce(
+      (acc, bubble) => {
+        const key = `col${bubble.colIdx}row${bubble.rowIdx}`;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
     console.log('Bubble assignments per cell:', bubbleAssignments);
 
     // Group bubbles by question rows
@@ -155,32 +161,37 @@ export class ImageRecognitionService {
 
     // First, separate bubbles into columns
     for (let col = 0; col < numberOfColumns; col++) {
-      const colBubbles = bubbles.filter(b => b.colIdx === col);
+      const colBubbles = bubbles.filter((b) => b.colIdx === col);
       bubblesByColumn[col] = colBubbles;
     }
 
     // For each column
     for (let col = 0; col < numberOfColumns; col++) {
       const colBubbles = bubblesByColumn[col];
-      
+
       // Sort bubbles in this column by Y position
       colBubbles.sort((a, b) => a.center.y - b.center.y);
-      
+
       // Group into rows
       for (let row = 0; row < questionsPerColumn; row++) {
         const startIdx = row * optionsPerQuestion;
-        const rowBubbles = colBubbles.slice(startIdx, startIdx + optionsPerQuestion);
-        
+        const rowBubbles = colBubbles.slice(
+          startIdx,
+          startIdx + optionsPerQuestion,
+        );
+
         if (rowBubbles.length === optionsPerQuestion) {
           // Sort options within row by X position
           rowBubbles.sort((a, b) => a.center.x - b.center.x);
-          
+
           // Calculate correct indices for this row
-          const baseIndex = col * (questionsPerColumn * optionsPerQuestion) + (row * optionsPerQuestion);
+          const baseIndex =
+            col * (questionsPerColumn * optionsPerQuestion) +
+            row * optionsPerQuestion;
           rowBubbles.forEach((bubble, optIdx) => {
             bubble.idx = baseIndex + optIdx;
           });
-          
+
           questionRows.push(rowBubbles);
         }
       }
@@ -200,11 +211,11 @@ export class ImageRecognitionService {
       const rowNum = (i % questionsPerColumn) + 1;
       console.log(
         `Question ${i + 1} (Column ${colNum}, Row ${rowNum}): ${group.length} options, indices:`,
-        group.map(b => ({
+        group.map((b) => ({
           idx: b.idx,
           x: Math.round(b.center.x),
-          y: Math.round(b.center.y)
-        }))
+          y: Math.round(b.center.y),
+        })),
       );
     });
 
@@ -215,39 +226,43 @@ export class ImageRecognitionService {
     for (let qIdx = 0; qIdx < questionBubbles.length; qIdx++) {
       const group = questionBubbles[qIdx];
       const markedIndices: number[] = [];
-      
-      const fillPercentages = await Promise.all(group.map(async bubble => {
-        const mask = new cv.Mat(binary.rows, binary.cols, cv.CV_8UC1, 0);
-        const contourPoints = bubble.cnt.getPoints();
-        const contours = [contourPoints];
-        const white = new cv.Vec3(255, 255, 255);
-        mask.drawContours(contours, 0, white, cv.FILLED);
-        
-        const rect = bubble.cnt.boundingRect();
-        const roi = binary.getRegion(rect);
-        const masked = roi.bitwiseAnd(mask.getRegion(rect));
-        const mean = cv.mean(masked, mask.getRegion(rect));
-        return mean.w;
-      }));
+
+      const fillPercentages = await Promise.all(
+        group.map(async (bubble) => {
+          const mask = new cv.Mat(binary.rows, binary.cols, cv.CV_8UC1, 0);
+          const contourPoints = bubble.cnt.getPoints();
+          const contours = [contourPoints];
+          const white = new cv.Vec3(255, 255, 255);
+          mask.drawContours(contours, 0, white, cv.FILLED);
+
+          const rect = bubble.cnt.boundingRect();
+          const roi = binary.getRegion(rect);
+          const masked = roi.bitwiseAnd(mask.getRegion(rect));
+          const mean = cv.mean(masked, mask.getRegion(rect));
+          return mean.w;
+        }),
+      );
 
       // Second pass: mark bubbles using the adaptive threshold
       const fillStats = {
         min: Math.min(...fillPercentages),
         max: Math.max(...fillPercentages),
-        avg: fillPercentages.reduce((a, b) => a + b, 0) / fillPercentages.length
+        avg:
+          fillPercentages.reduce((a, b) => a + b, 0) / fillPercentages.length,
       };
 
       // Use a more robust threshold calculation
       const effectiveThreshold = Math.min(
         fillThreshold,
-        (fillStats.min + fillStats.max) / 2 + 20 // Midpoint + margin
+        (fillStats.min + fillStats.max) / 2 + 20, // Midpoint + margin
       );
 
-      if (qIdx === 9) { // Question 10
+      if (qIdx === 9) {
+        // Question 10
         console.log('Question 10 fill statistics:', {
           fillStats,
           effectiveThreshold,
-          fillPercentages
+          fillPercentages,
         });
       }
 
@@ -274,25 +289,28 @@ export class ImageRecognitionService {
       });
 
       // Convert marked indices to letters
-      const selected = markedIndices.map(idx => String.fromCharCode(65 + idx));
+      const selected = markedIndices.map((idx) =>
+        String.fromCharCode(65 + idx),
+      );
 
       // Add validation logging
-      if (qIdx === 9) { // Question 10
+      if (qIdx === 9) {
+        // Question 10
         console.log('Question 10 processing:', {
-          group: group.map(b => b.idx),
+          group: group.map((b) => b.idx),
           markedIndices,
           selected,
           marked,
           bubbleToLetter: group.map((b, i) => ({
             bubbleIdx: b.idx,
-            letter: String.fromCharCode(65 + i)
-          }))
+            letter: String.fromCharCode(65 + i),
+          })),
         });
       }
 
-      perQuestion.push({ 
-        question: qIdx + 1, 
-        selected
+      perQuestion.push({
+        question: qIdx + 1,
+        selected,
       });
     }
 
@@ -302,9 +320,14 @@ export class ImageRecognitionService {
       await fs.mkdir(ImageRecognitionService.OUTPUT_DIR, { recursive: true });
       const overlayPath = path.join(
         ImageRecognitionService.OUTPUT_DIR,
-        `omr_debug_${Date.now()}.png`
+        `omr_debug_${Date.now()}.png`,
       );
-      await ImageRecognitionService.saveDebugOverlay(mat, bubbles, marked, overlayPath);
+      await ImageRecognitionService.saveDebugOverlay(
+        mat,
+        bubbles,
+        marked,
+        overlayPath,
+      );
       debugOverlayPath = overlayPath;
     }
 
@@ -313,32 +336,36 @@ export class ImageRecognitionService {
 
   static async generateDebugOverlay(
     image: Buffer,
-    debugInfo: BubbleResult['debug'] = []
+    debugInfo: BubbleResult['debug'] = [],
   ): Promise<Buffer> {
     const sharpImg = sharp(image).ensureAlpha();
     const meta = await sharpImg.metadata();
     const raw = await sharpImg.raw().toBuffer();
     const mat = new cv.Mat(raw, meta.height!, meta.width!, cv.CV_8UC4);
-    
+
     const overlay = mat.copy();
     for (const bubble of debugInfo) {
-      const color = bubble.fill && bubble.fill > ImageRecognitionService.FILL_THRESHOLD
-        ? new cv.Vec3(0, 0, 255)  // Red for marked
-        : new cv.Vec3(255, 0, 0); // Blue for unmarked
-        
+      const color =
+        bubble.fill && bubble.fill > ImageRecognitionService.FILL_THRESHOLD
+          ? new cv.Vec3(0, 0, 255) // Red for marked
+          : new cv.Vec3(255, 0, 0); // Blue for unmarked
+
       overlay.drawRectangle(
         new cv.Point2(bubble.bbox.left, bubble.bbox.top),
         new cv.Point2(
           bubble.bbox.left + bubble.bbox.size,
-          bubble.bbox.top + bubble.bbox.size
+          bubble.bbox.top + bubble.bbox.size,
         ),
         color,
-        2
+        2,
       );
     }
-    
+
     // Convert back to buffer
-    const tempPath = path.join(ImageRecognitionService.OUTPUT_DIR, `temp_${Date.now()}.png`);
+    const tempPath = path.join(
+      ImageRecognitionService.OUTPUT_DIR,
+      `temp_${Date.now()}.png`,
+    );
     cv.imwrite(tempPath, overlay);
     const buffer = await fs.readFile(tempPath);
     await fs.unlink(tempPath);
@@ -352,35 +379,38 @@ export class ImageRecognitionService {
     height?: number;
   }): Promise<Buffer> {
     const { bubbleCount, marked, width = 600, height = 900 } = options;
-    
+
     // Create blank white image with alpha
     const white = new cv.Vec4(255, 255, 255, 255);
     const black = new cv.Vec4(0, 0, 0, 255);
     const mat = new cv.Mat(height, width, cv.CV_8UC4);
     mat.setTo(white);
-    
+
     // Calculate bubble size and spacing
     const bubbleSize = 30;
     const spacing = 40;
     const cols = Math.min(5, bubbleCount);
     const rows = Math.ceil(bubbleCount / cols);
-    
+
     // Draw bubbles
     for (let i = 0; i < bubbleCount; i++) {
       const row = Math.floor(i / cols);
       const col = i % cols;
       const x = 50 + col * spacing;
       const y = 50 + row * spacing;
-      
+
       // Draw circle
       const color = marked.includes(i + 1) ? black : white;
-      const center = new cv.Point2(x + bubbleSize/2, y + bubbleSize/2);
-      mat.drawCircle(center, bubbleSize/2, color as any, cv.LINE_8);
-      mat.drawCircle(center, bubbleSize/2, black as any, cv.LINE_8);
+      const center = new cv.Point2(x + bubbleSize / 2, y + bubbleSize / 2);
+      mat.drawCircle(center, bubbleSize / 2, color as any, cv.LINE_8);
+      mat.drawCircle(center, bubbleSize / 2, black as any, cv.LINE_8);
     }
-    
+
     // Convert to buffer
-    const tempPath = path.join(ImageRecognitionService.OUTPUT_DIR, `temp_${Date.now()}.png`);
+    const tempPath = path.join(
+      ImageRecognitionService.OUTPUT_DIR,
+      `temp_${Date.now()}.png`,
+    );
     await cv.imwriteAsync(tempPath, mat);
     const buffer = await fs.readFile(tempPath);
     await fs.unlink(tempPath);
@@ -388,7 +418,11 @@ export class ImageRecognitionService {
   }
 
   static buildBubbleMap(questions: any[], questionsPerCol = 10, numCols = 3) {
-    const bubbleMap: { questionIndex: number; optionIndex: number; label: string }[] = [];
+    const bubbleMap: {
+      questionIndex: number;
+      optionIndex: number;
+      label: string;
+    }[] = [];
     for (let col = 0; col < numCols; col++) {
       for (let row = 0; row < questionsPerCol; row++) {
         const qIdx = col * questionsPerCol + row;
@@ -410,13 +444,13 @@ export class ImageRecognitionService {
     mat: any,
     bubbles: Bubble[],
     marked: number[],
-    outPath: string
+    outPath: string,
   ) {
     const overlay = mat.copy();
     for (const bubble of bubbles) {
       const color = marked.includes(bubble.idx)
-        ? new cv.Vec3(0, 0, 255)  // Red for marked
-        : new cv.Vec3(255, 0, 0);  // Blue for unmarked
+        ? new cv.Vec3(0, 0, 255) // Red for marked
+        : new cv.Vec3(255, 0, 0); // Blue for unmarked
 
       // Draw the contour
       const contourPoints = bubble.cnt.getPoints();
@@ -427,7 +461,7 @@ export class ImageRecognitionService {
         new cv.Point2(bubble.center.x, bubble.center.y),
         2,
         color,
-        -1
+        -1,
       );
 
       // Draw the bubble index
@@ -437,7 +471,7 @@ export class ImageRecognitionService {
         cv.FONT_HERSHEY_SIMPLEX,
         0.5,
         color,
-        1
+        1,
       );
     }
     cv.imwrite(outPath, overlay);

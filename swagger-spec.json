@@ -1,0 +1,980 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/ping": {
+      "get": {
+        "operationId": "AppController_getPing",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "AppController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/cleanup-db": {
+      "delete": {
+        "operationId": "AppController_cleanupDb",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Admin registered successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "user": {
+                      "id": "uuid",
+                      "username": "john_doe",
+                      "role": "admin"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username already exists"
+          }
+        },
+        "summary": "Register new user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "user": {
+                      "id": "uuid",
+                      "username": "john_doe",
+                      "role": "user"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "summary": "Login user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/user": {
+      "post": {
+        "operationId": "AuthController_createUser",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "uuid",
+                    "username": "john_doe",
+                    "role": "user"
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Username already exists"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create new user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get current user profile",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me/tests": {
+      "get": {
+        "operationId": "AuthController_getMyTests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of tests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": [
+                    {
+                      "id": "...",
+                      "title": "...",
+                      "createdAt": "...",
+                      "questionCount": 10
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get all tests uploaded by the current user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me/results": {
+      "get": {
+        "operationId": "AuthController_getMyResults",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of submissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": [
+                    {
+                      "submissionId": "...",
+                      "testTitle": "...",
+                      "correct": 8,
+                      "total": 10,
+                      "submittedAt": "..."
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get all test submissions by the current user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/me/stats": {
+      "get": {
+        "operationId": "AuthController_getMyStats",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "totalTestsTaken": 5,
+                    "averageScore": 8.2,
+                    "highestScore": 10,
+                    "lowestScore": 6
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get summary stats for the current user",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/auth/users": {
+      "get": {
+        "operationId": "AuthController_getUsers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User stats"
+          }
+        },
+        "summary": "Get list of users",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/tests/upload": {
+      "post": {
+        "operationId": "TestsController_uploadTest",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Parsed and saved test",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "uuid",
+                    "name": "Test",
+                    "questions": [
+                      {
+                        "question": "Q?",
+                        "answers": [
+                          {
+                            "text": "A",
+                            "isCorrect": true
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or invalid file type"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upload a .docx test file (Admin only)",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/{testId}/settings": {
+      "post": {
+        "operationId": "TestsController_setSettings",
+        "parameters": [
+          {
+            "name": "testId",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Settings saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "shuffle_questions": true,
+                    "shuffle_answers": false,
+                    "shuffle_all": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Set test randomization settings (user only)",
+        "tags": [
+          "Tests"
+        ]
+      },
+      "get": {
+        "operationId": "TestsController_getSettings",
+        "parameters": [
+          {
+            "name": "testId",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "shuffle_questions": true,
+                    "shuffle_answers": false,
+                    "shuffle_all": false
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get test randomization settings (Admin only)",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/{testId}/variants": {
+      "get": {
+        "operationId": "TestsController_getTestVariants",
+        "parameters": [
+          {
+            "name": "testId",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current settings"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get test variants",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/{id}/generate": {
+      "post": {
+        "operationId": "TestsController_generate",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "List of generated variants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "variants": [
+                      {
+                        "variantId": "uuid",
+                        "pdfFilePath": "/public/generated/uuid.pdf",
+                        "docxFilePath": "/ed/uuid.docx"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Generate randomized test variants (Admin only)",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/{id}/submit": {
+      "post": {
+        "operationId": "TestsController_submit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variantId": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "answers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variantId": {
+                    "type": "string"
+                  },
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "answers": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Submission result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "score": 5,
+                    "total": 10,
+                    "breakdown": [
+                      {
+                        "question": 1,
+                        "selected": "B",
+                        "correct": "C",
+                        "isCorrect": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid submission data or image format"
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test or variant not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Submit answers for a test and get results",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/{id}/submissions/export": {
+      "get": {
+        "operationId": "TestsController_exportSubmissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Excel file with all submissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Export all submissions for a test as Excel (Admin only)",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/{id}/submissions": {
+      "get": {
+        "operationId": "TestsController_listSubmissions",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the test",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of submissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": [
+                    {
+                      "id": "...",
+                      "userId": "...",
+                      "correctCount": 5,
+                      "createdAt": "..."
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Test not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List all submissions for a test (Admin only)",
+        "tags": [
+          "Tests"
+        ]
+      }
+    },
+    "/tests/submissions/{id}": {
+      "get": {
+        "operationId": "TestsController_getSubmission",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID of the submission",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Submission details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "...",
+                    "userId": "...",
+                    "correctCount": 5,
+                    "incorrect": [],
+                    "createdAt": "..."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - Invalid or missing JWT token"
+          },
+          "403": {
+            "description": "Forbidden - Insufficient role permissions"
+          },
+          "404": {
+            "description": "Submission not found"
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get a single submission by ID (Admin only)",
+        "tags": [
+          "Tests"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Testing System API",
+    "description": "API for test management and generation",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "name": "JWT",
+        "description": "Enter JWT token",
+        "in": "header"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "john_doe",
+            "description": "Username (min 3 characters)"
+          },
+          "password": {
+            "type": "string",
+            "example": "password123",
+            "description": "Password (min 6 characters)"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "example": "john_doe",
+            "description": "Username"
+          },
+          "password": {
+            "type": "string",
+            "example": "password123",
+            "description": "Password"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ]
+      },
+      "UserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "uuid",
+            "description": "User ID"
+          },
+          "username": {
+            "type": "string",
+            "example": "john_doe",
+            "description": "Username"
+          },
+          "role": {
+            "type": "string",
+            "example": "admin",
+            "description": "Role (admin or user)"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "role"
+        ]
+      },
+      "TestSettingsDto": {
+        "type": "object",
+        "properties": {
+          "shuffle_questions": {
+            "type": "boolean",
+            "description": "Shuffle questions",
+            "example": true
+          },
+          "shuffle_answers": {
+            "type": "boolean",
+            "description": "Shuffle answers",
+            "example": false
+          },
+          "shuffle_all": {
+            "type": "boolean",
+            "description": "Shuffle all",
+            "example": false
+          }
+        },
+        "required": [
+          "shuffle_questions",
+          "shuffle_answers",
+          "shuffle_all"
+        ]
+      },
+      "GenerateDto": {
+        "type": "object",
+        "properties": {
+          "copies": {
+            "type": "number",
+            "description": "Number of copies to generate",
+            "example": 30
+          }
+        },
+        "required": [
+          "copies"
+        ]
+      }
+    }
+  }
+}

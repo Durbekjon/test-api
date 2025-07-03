@@ -1,9 +1,24 @@
-import { Controller, Post, UseGuards, Request, Body, Get, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  UseGuards,
+  Request,
+  Body,
+  Get,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 // import { LocalAuthGuard } from './local-auth.guard';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
-import { ApiTags, ApiOperation, ApiBody, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBody,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { UserDto, RegisterDto } from './dto/user.dto';
 import { CurrentUser, JwtUser } from './current-user.decorator';
 import { Roles } from './roles.decorator';
@@ -16,21 +31,20 @@ export class AuthController {
   @Post('register')
   @ApiOperation({ summary: 'Register new user' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ 
-    status: 201, 
-    description: 'Admin registered successfully', 
-    schema: { 
-      example: { 
+  @ApiResponse({
+    status: 201,
+    description: 'Admin registered successfully',
+    schema: {
+      example: {
         access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 'uuid',
           username: 'john_doe',
-          role: 'admin'
-        }
-      } 
-    } 
+          role: 'admin',
+        },
+      },
+    },
   })
-    
   @ApiResponse({ status: 409, description: 'Username already exists' })
   async register(@Body() registerDto: RegisterDto) {
     registerDto.role = 'admin';
@@ -40,19 +54,19 @@ export class AuthController {
   @Post('login')
   @ApiOperation({ summary: 'Login user' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ 
-    status: 200, 
-    description: 'Login successful', 
-    schema: { 
-      example: { 
+  @ApiResponse({
+    status: 200,
+    description: 'Login successful',
+    schema: {
+      example: {
         access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 'uuid',
           username: 'john_doe',
-          role: 'user'
-        }
-      } 
-    } 
+          role: 'user',
+        },
+      },
+    },
   })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Body() loginDto: LoginDto) {
@@ -65,7 +79,11 @@ export class AuthController {
   @Roles('admin')
   @ApiOperation({ summary: 'Create new user' })
   @ApiBody({ type: RegisterDto })
-  @ApiResponse({ status: 201, description: 'User created successfully', schema: { example: { id: 'uuid', username: 'john_doe', role: 'user' } } })
+  @ApiResponse({
+    status: 201,
+    description: 'User created successfully',
+    schema: { example: { id: 'uuid', username: 'john_doe', role: 'user' } },
+  })
   @ApiResponse({ status: 409, description: 'Username already exists' })
   async createUser(@Body() registerDto: RegisterDto) {
     return this.authService.createUser(registerDto);
@@ -84,7 +102,15 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me/tests')
   @ApiOperation({ summary: 'Get all tests uploaded by the current user' })
-  @ApiResponse({ status: 200, description: 'List of tests', schema: { example: [{ id: '...', title: '...', createdAt: '...', questionCount: 10 }] } })
+  @ApiResponse({
+    status: 200,
+    description: 'List of tests',
+    schema: {
+      example: [
+        { id: '...', title: '...', createdAt: '...', questionCount: 10 },
+      ],
+    },
+  })
   async getMyTests(@CurrentUser() user: JwtUser) {
     return this.authService.getMyTests(user.userId);
   }
@@ -92,7 +118,21 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me/results')
   @ApiOperation({ summary: 'Get all test submissions by the current user' })
-  @ApiResponse({ status: 200, description: 'List of submissions', schema: { example: [{ submissionId: '...', testTitle: '...', correct: 8, total: 10, submittedAt: '...' }] } })
+  @ApiResponse({
+    status: 200,
+    description: 'List of submissions',
+    schema: {
+      example: [
+        {
+          submissionId: '...',
+          testTitle: '...',
+          correct: 8,
+          total: 10,
+          submittedAt: '...',
+        },
+      ],
+    },
+  })
   async getMyResults(@CurrentUser() user: JwtUser) {
     return this.authService.getMyResults(user.userId);
   }
@@ -100,8 +140,30 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me/stats')
   @ApiOperation({ summary: 'Get summary stats for the current user' })
-  @ApiResponse({ status: 200, description: 'User stats', schema: { example: { totalTestsTaken: 5, averageScore: 8.2, highestScore: 10, lowestScore: 6 } } })
+  @ApiResponse({
+    status: 200,
+    description: 'User stats',
+    schema: {
+      example: {
+        totalTestsTaken: 5,
+        averageScore: 8.2,
+        highestScore: 10,
+        lowestScore: 6,
+      },
+    },
+  })
   async getMyStats(@CurrentUser() user: JwtUser) {
     return this.authService.getMyStats(user.userId);
+  }
+  @UseGuards(JwtAuthGuard)
+  @Roles('admin')
+  @Get('users')
+  @ApiOperation({ summary: 'Get list of users' })
+  @ApiResponse({
+    status: 200,
+    description: 'User stats',
+  })
+  async getUsers(@CurrentUser() user: JwtUser) {
+    return this.authService.getUsersList(user.userId);
   }
 }

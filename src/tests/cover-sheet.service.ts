@@ -4,7 +4,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export class CoverSheetService {
-  static async generateCover({ title, variant }: { title: string; variant: any }): Promise<string> {
+  static async generateCover({
+    title,
+    variant,
+  }: {
+    title: string;
+    variant: any;
+  }): Promise<string> {
     const uuid = variant.id || uuidv4();
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([595.28, 841.89]); // A4 in points
@@ -54,17 +60,24 @@ export class CoverSheetService {
         throw new Error('Missing or malformed structure.questions');
       }
       questions = variant.structure.questions;
-      maxOptions = Math.max(...questions.map(q => Array.isArray(q.options) ? q.options.length : 0));
+      maxOptions = Math.max(
+        ...questions.map((q) =>
+          Array.isArray(q.options) ? q.options.length : 0,
+        ),
+      );
     } catch (e) {
       console.warn('[CoverSheetService] Invalid variant.structure:', e);
       // Render placeholder message
-      page.drawText('Invalid or missing variant structure. Cannot render answer grid.', {
-        x: margin,
-        y: height / 2,
-        size: 16,
-        font: helveticaBold,
-        color: rgb(1, 0, 0),
-      });
+      page.drawText(
+        'Invalid or missing variant structure. Cannot render answer grid.',
+        {
+          x: margin,
+          y: height / 2,
+          size: 16,
+          font: helveticaBold,
+          color: rgb(1, 0, 0),
+        },
+      );
       // Footer and save as usual
       const footer = 'Mark the correct bubble with a dark pen.';
       const footerFontSize = 10;
@@ -77,7 +90,8 @@ export class CoverSheetService {
         color: rgb(0, 0, 0),
       });
       const outputDir = path.join(process.cwd(), 'public/tests');
-      if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+      if (!fs.existsSync(outputDir))
+        fs.mkdirSync(outputDir, { recursive: true });
       const filePath = path.join(outputDir, `${uuid}.pdf`);
       const pdfBytes = await pdfDoc.save();
       fs.writeFileSync(filePath, pdfBytes);
@@ -100,18 +114,26 @@ export class CoverSheetService {
       }
       gridPageNum++;
       // Option header row (A, B, C, ...) for each column
-      const questionsOnThisPage = Math.min(maxQuestionsPerGridPage, questions.length - gridQIdx);
+      const questionsOnThisPage = Math.min(
+        maxQuestionsPerGridPage,
+        questions.length - gridQIdx,
+      );
       const questionsPerCol = 10;
       const numColsGrid = Math.ceil(questionsOnThisPage / questionsPerCol);
       const colWidth = maxOptions * (bubbleDiameter + bubbleMargin) + 50; // 50pt for question number
       const startY = height - margin - titleFontSize - 60;
       const rowHeight = bubbleDiameter + 2 * mm + 18;
-      const startX = (width - (numColsGrid * colWidth)) / 2;
+      const startX = (width - numColsGrid * colWidth) / 2;
       // Draw option headers for each column
       for (let col = 0; col < numColsGrid; col++) {
         for (let opt = 0; opt < maxOptions; opt++) {
           const optLabel = String.fromCharCode(65 + opt);
-          const x = startX + col * colWidth + 40 + opt * (bubbleDiameter + bubbleMargin) + bubbleRadius;
+          const x =
+            startX +
+            col * colWidth +
+            40 +
+            opt * (bubbleDiameter + bubbleMargin) +
+            bubbleRadius;
           page.drawText(optLabel, {
             x: x - helvetica.widthOfTextAtSize(optLabel, optionFontSize) / 2,
             y: startY + 10,
@@ -125,7 +147,11 @@ export class CoverSheetService {
       for (let col = 0; col < numColsGrid; col++) {
         for (let row = 0; row < questionsPerCol; row++) {
           const qIdx = gridQIdx + col * questionsPerCol + row;
-          if (qIdx >= gridQIdx + questionsOnThisPage || qIdx >= questions.length) break;
+          if (
+            qIdx >= gridQIdx + questionsOnThisPage ||
+            qIdx >= questions.length
+          )
+            break;
           const q = questions[qIdx];
           const y = startY - (row + 1) * rowHeight;
           // Draw question number
@@ -140,13 +166,26 @@ export class CoverSheetService {
           // Draw subtle guide line
           page.drawLine({
             start: { x: startX + col * colWidth + 40, y: y - bubbleRadius - 2 },
-            end: { x: startX + col * colWidth + 40 + (maxOptions - 1) * (bubbleDiameter + bubbleMargin) + bubbleDiameter, y: y - bubbleRadius - 2 },
+            end: {
+              x:
+                startX +
+                col * colWidth +
+                40 +
+                (maxOptions - 1) * (bubbleDiameter + bubbleMargin) +
+                bubbleDiameter,
+              y: y - bubbleRadius - 2,
+            },
             thickness: 0.5,
             color: rowGuideColor,
           });
           // Draw bubbles for each option
           for (let opt = 0; opt < maxOptions; opt++) {
-            const x = startX + col * colWidth + 40 + opt * (bubbleDiameter + bubbleMargin) + bubbleRadius;
+            const x =
+              startX +
+              col * colWidth +
+              40 +
+              opt * (bubbleDiameter + bubbleMargin) +
+              bubbleRadius;
             if (q.options && q.options[opt]) {
               page.drawCircle({
                 x,
@@ -176,8 +215,22 @@ export class CoverSheetService {
       gridQIdx += questionsOnThisPage;
     }
 
+    // Utility to sanitize text for PDF (replace ligatures, etc.)
+    function sanitizePdfText(text: string): string {
+      return text
+        .replace(/\uFB01/g, 'fi') // ﬁ
+        .replace(/\uFB02/g, 'fl'); // ﬂ
+    }
+
     // Helper: Wrap text into lines that fit maxWidth
-    function wrapText(text: string, font: any, fontSize: number, maxWidth: number): string[] {
+    function wrapText(
+      text: string,
+      font: any,
+      fontSize: number,
+      maxWidth: number,
+    ): string[] {
+      // Sanitize text before wrapping
+      text = sanitizePdfText(text);
       const words = text.split(' ');
       const lines: string[] = [];
       let currentLine = '';
@@ -196,27 +249,49 @@ export class CoverSheetService {
     }
 
     // SAVOLLAR VA VARIANTLAR 2-SAHIFADA (FLEXIBLE LAYOUT, WRAPPING, MULTI-PAGE)
-    function renderQuestionsOnPage(page: any, startQIdx: number, questions: any[], qaColCount: number, qaColWidth: number, qaColGap: number, qaMargin: number, qaFontSize: number, qaLineSpacing: number, qaStartY: number, qaMinY: number, helvetica: any) {
+    function renderQuestionsOnPage(
+      page: any,
+      startQIdx: number,
+      questions: any[],
+      qaColCount: number,
+      qaColWidth: number,
+      qaColGap: number,
+      qaMargin: number,
+      qaFontSize: number,
+      qaLineSpacing: number,
+      qaStartY: number,
+      qaMinY: number,
+      helvetica: any,
+    ) {
       let col = 0;
       let qaY = qaStartY;
       let colX = qaMargin;
       let qIdx = startQIdx;
-      for (; qIdx < questions.length;) {
+      for (; qIdx < questions.length; ) {
         const q = questions[qIdx];
-        const qText = `${qIdx + 1}. ${q.text || ''}`;
+        // Sanitize question text
+        const qText = `${qIdx + 1}. ${sanitizePdfText(q.text || '')}`;
         const qLines = wrapText(qText, helvetica, qaFontSize, qaColWidth - 10);
-        const qTextHeight = qLines.length * qaFontSize + (qLines.length - 1) * 2;
+        const qTextHeight =
+          qLines.length * qaFontSize + (qLines.length - 1) * 2;
         let totalHeight = qTextHeight + qaLineSpacing;
         let optLinesArr: string[][] = [];
         let optHeights: number[] = [];
         if (Array.isArray(q.options)) {
           for (let o = 0; o < q.options.length; o++) {
             const optLabel = String.fromCharCode(65 + o);
-            const optText = q.options[o]?.text || '';
+            // Sanitize option text
+            const optText = sanitizePdfText(q.options[o]?.text || '');
             const optLine = `   ${optLabel}. ${optText}`;
-            const optLines = wrapText(optLine, helvetica, qaFontSize, qaColWidth - 20);
+            const optLines = wrapText(
+              optLine,
+              helvetica,
+              qaFontSize,
+              qaColWidth - 20,
+            );
             optLinesArr.push(optLines);
-            const optHeight = optLines.length * qaFontSize + (optLines.length - 1) * 2;
+            const optHeight =
+              optLines.length * qaFontSize + (optLines.length - 1) * 2;
             optHeights.push(optHeight);
             totalHeight += optHeight + 2;
           }
@@ -277,7 +352,8 @@ export class CoverSheetService {
       const qaWidth = qaPage.getWidth();
       const qaHeight = qaPage.getHeight();
       const qaColCount = Math.ceil(Math.min(30, questions.length) / 10);
-      const qaColWidth = (qaWidth - 2 * margin - (qaColCount - 1) * qaColGap) / qaColCount;
+      const qaColWidth =
+        (qaWidth - 2 * margin - (qaColCount - 1) * qaColGap) / qaColCount;
       const qaStartY = qaHeight - margin - qaFontSize;
       const qaMinY = margin + 30;
       nextQIdx = renderQuestionsOnPage(
@@ -292,7 +368,7 @@ export class CoverSheetService {
         qaLineSpacing,
         qaStartY,
         qaMinY,
-        helvetica
+        helvetica,
       );
     }
 
@@ -306,4 +382,4 @@ export class CoverSheetService {
     const publicUrl = `/public/tests/${uuid}.pdf`;
     return publicUrl;
   }
-} 
+}

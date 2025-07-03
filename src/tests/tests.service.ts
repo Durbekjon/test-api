@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import * as mammoth from 'mammoth';
 import { PrismaService } from '../prisma/prisma.service';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,26 +11,57 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as ExcelJS from 'exceljs';
 import { CoverSheetService } from './cover-sheet.service';
-import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle } from 'docx';
+import {
+  Document,
+  Packer,
+  Paragraph,
+  TextRun,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  AlignmentType,
+  BorderStyle,
+} from 'docx';
+import { TestVariant } from '@prisma/client';
 
 @Injectable()
 export class TestsService {
   constructor(private prisma: PrismaService) {}
 
-  async parseDocx(buffer: Buffer): Promise<{ questions: { question: string; answers: { text: string; isCorrect: boolean }[] }[] }> {
+  async parseDocx(buffer: Buffer): Promise<{
+    questions: {
+      question: string;
+      answers: { text: string; isCorrect: boolean }[];
+    }[];
+  }> {
     const { value } = await mammoth.extractRawText({ buffer });
-    const lines = value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-    const questions: { question: string; answers: { text: string; isCorrect: boolean }[] }[] = [];
-    let currentQuestion: { text: string; answers: { text: string; isCorrect: boolean }[]; correctAnswers: number } | null = null;
+    const lines = value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const questions: {
+      question: string;
+      answers: { text: string; isCorrect: boolean }[];
+    }[] = [];
+    let currentQuestion: {
+      text: string;
+      answers: { text: string; isCorrect: boolean }[];
+      correctAnswers: number;
+    } | null = null;
     for (const line of lines) {
       if (line.startsWith('?')) {
         if (currentQuestion) {
           if (currentQuestion.correctAnswers !== 1) {
-            throw new BadRequestException('Each question must have exactly one correct answer');
+            throw new BadRequestException(
+              'Each question must have exactly one correct answer',
+            );
           }
           questions.push({
             question: currentQuestion.text,
-            answers: Array.isArray(currentQuestion.answers) ? currentQuestion.answers : [],
+            answers: Array.isArray(currentQuestion.answers)
+              ? currentQuestion.answers
+              : [],
           });
         }
         currentQuestion = {
@@ -35,35 +70,58 @@ export class TestsService {
           correctAnswers: 0,
         };
       } else if (line.startsWith('+')) {
-        if (!currentQuestion) throw new BadRequestException('Answer before question');
-        currentQuestion.answers.push({ text: line.slice(1).trim(), isCorrect: true });
+        if (!currentQuestion)
+          throw new BadRequestException('Answer before question');
+        currentQuestion.answers.push({
+          text: line.slice(1).trim(),
+          isCorrect: true,
+        });
         currentQuestion.correctAnswers++;
       } else if (line.startsWith('-')) {
-        if (!currentQuestion) throw new BadRequestException('Answer before question');
-        currentQuestion.answers.push({ text: line.slice(1).trim(), isCorrect: false });
+        if (!currentQuestion)
+          throw new BadRequestException('Answer before question');
+        currentQuestion.answers.push({
+          text: line.slice(1).trim(),
+          isCorrect: false,
+        });
       }
     }
     if (currentQuestion) {
       if (currentQuestion.correctAnswers !== 1) {
-        throw new BadRequestException('Each question must have exactly one correct answer');
+        throw new BadRequestException(
+          'Each question must have exactly one correct answer',
+        );
       }
       questions.push({
         question: currentQuestion.text,
-        answers: Array.isArray(currentQuestion.answers) ? currentQuestion.answers : [],
+        answers: Array.isArray(currentQuestion.answers)
+          ? currentQuestion.answers
+          : [],
       });
     }
     return { questions };
   }
 
-  async saveTest(name: string, questions: { question: string; answers: { text: string; isCorrect: boolean }[] }[]) {
+  async saveTest(
+    name: string,
+    questions: {
+      question: string;
+      answers: { text: string; isCorrect: boolean }[];
+    }[],
+  ) {
     return this.prisma.test.create({
       data: {
         name,
         questions: {
-          create: questions.map(q => ({
+          create: questions.map((q) => ({
             text: q.question,
             answers: {
-              create: Array.isArray(q.answers) ? q.answers.map(a => ({ text: a.text, isCorrect: a.isCorrect })) : [],
+              create: Array.isArray(q.answers)
+                ? q.answers.map((a) => ({
+                    text: a.text,
+                    isCorrect: a.isCorrect,
+                  }))
+                : [],
             },
           })),
         },
@@ -84,7 +142,26 @@ export class TestsService {
     });
   }
 
-  async setSettings(testId: string, settings: { shuffle_questions: boolean; shuffle_answers: boolean; shuffle_all: boolean }, userId?: string) {
+  async getTestVariants(
+    testId: string,
+    userId: string,
+  ): Promise<TestVariant[]> {
+    const test = await this.prisma.test.findUnique({ where: { id: testId } });
+    if (!test)
+      throw new BadRequestException('Invalid test id: Test does not exist');
+
+    return this.prisma.testVariant.findMany({ where: { testId } });
+  }
+
+  async setSettings(
+    testId: string,
+    settings: {
+      shuffle_questions: boolean;
+      shuffle_answers: boolean;
+      shuffle_all: boolean;
+    },
+    userId?: string,
+  ) {
     return this.prisma.testSettings.upsert({
       where: { testId },
       update: settings,
@@ -96,7 +173,12 @@ export class TestsService {
     });
   }
 
-  async generateDocxVariant(filePath: string, variantId: string, testName: string, questions: any[]) {
+  async generateDocxVariant(
+    filePath: string,
+    variantId: string,
+    testName: string,
+    questions: any[],
+  ) {
     // Title and UUID
     const doc = new Document({
       sections: [
@@ -125,19 +207,22 @@ export class TestsService {
               spacing: { after: 400 },
             }),
             // Questions and answers
-            ...questions.map((q: any, idx: number) => [
-              new Paragraph({
-                text: `${idx + 1}. ${q.text}`,
-                spacing: { after: 100 },
-              }),
-              ...q.answers.map((a: any, aidx: number) =>
+            ...questions
+              .map((q: any, idx: number) => [
                 new Paragraph({
-                  text: `   ${String.fromCharCode(65 + aidx)}. ${a.text}`,
-                  spacing: { after: 50 },
-                })
-              ),
-              new Paragraph(''),
-            ]).flat(),
+                  text: `${idx + 1}. ${q.text}`,
+                  spacing: { after: 100 },
+                }),
+                ...q.answers.map(
+                  (a: any, aidx: number) =>
+                    new Paragraph({
+                      text: `   ${String.fromCharCode(65 + aidx)}. ${a.text}`,
+                      spacing: { after: 50 },
+                    }),
+                ),
+                new Paragraph(''),
+              ])
+              .flat(),
           ],
         },
       ],
@@ -153,17 +238,19 @@ export class TestsService {
     const numCols = Math.ceil(bubbleCount / maxPerCol);
     const rows: TableRow[] = [];
     // Header row (A, B, C, ...)
-    const maxOptions = Math.max(...questions.map(q => q.answers.length));
+    const maxOptions = Math.max(...questions.map((q) => q.answers.length));
     const headerCells = [
       new TableCell({
         children: [new Paragraph('Q#')],
         width: { size: 1000, type: WidthType.DXA },
       }),
-      ...Array.from({ length: maxOptions }, (_, i) =>
-        new TableCell({
-          children: [new Paragraph(String.fromCharCode(65 + i))],
-          width: { size: 1000, type: WidthType.DXA },
-        })
+      ...Array.from(
+        { length: maxOptions },
+        (_, i) =>
+          new TableCell({
+            children: [new Paragraph(String.fromCharCode(65 + i))],
+            width: { size: 1000, type: WidthType.DXA },
+          }),
       ),
     ];
     rows.push(new TableRow({ children: headerCells }));
@@ -178,20 +265,38 @@ export class TestsService {
               children: [new Paragraph(qNum.toString())],
               width: { size: 1000, type: WidthType.DXA },
             }),
-            ...Array.from({ length: maxOptions }, (_, j) =>
-              new TableCell({
-                children: [new Paragraph('○')],
-                width: { size: 1000, type: WidthType.DXA },
-                borders: {
-                  top: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
-                  bottom: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
-                  left: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
-                  right: { style: BorderStyle.SINGLE, size: 1, color: 'cccccc' },
-                },
-              })
+            ...Array.from(
+              { length: maxOptions },
+              (_, j) =>
+                new TableCell({
+                  children: [new Paragraph('○')],
+                  width: { size: 1000, type: WidthType.DXA },
+                  borders: {
+                    top: {
+                      style: BorderStyle.SINGLE,
+                      size: 1,
+                      color: 'cccccc',
+                    },
+                    bottom: {
+                      style: BorderStyle.SINGLE,
+                      size: 1,
+                      color: 'cccccc',
+                    },
+                    left: {
+                      style: BorderStyle.SINGLE,
+                      size: 1,
+                      color: 'cccccc',
+                    },
+                    right: {
+                      style: BorderStyle.SINGLE,
+                      size: 1,
+                      color: 'cccccc',
+                    },
+                  },
+                }),
             ),
           ],
-        })
+        }),
       );
     }
     return new Table({
@@ -201,7 +306,12 @@ export class TestsService {
     });
   }
 
-  async generateVariants(testId: string, copies: number): Promise<{ variantId: string; pdfFilePath: string; docxFilePath: string }[]> {
+  async generateVariants(
+    testId: string,
+    copies: number,
+  ): Promise<
+    { variantId: string; pdfFilePath: string; docxFilePath: string }[]
+  > {
     // Fetch test, questions, answers, and settings
     const test = await this.prisma.test.findUnique({
       where: { id: testId },
@@ -211,8 +321,16 @@ export class TestsService {
       },
     });
     if (!test) throw new Error('Test not found');
-    const settings = test.testSettings || { shuffle_questions: false, shuffle_answers: false, shuffle_all: false };
-    const variants: { variantId: string; pdfFilePath: string; docxFilePath: string }[] = [];
+    const settings = test.testSettings || {
+      shuffle_questions: false,
+      shuffle_answers: false,
+      shuffle_all: false,
+    };
+    const variants: {
+      variantId: string;
+      pdfFilePath: string;
+      docxFilePath: string;
+    }[] = [];
     const outputDir = path.join(process.cwd(), 'public/generated');
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
     for (let i = 0; i < copies; i++) {
@@ -221,10 +339,16 @@ export class TestsService {
       // Shuffle logic
       if (settings.shuffle_all) {
         questions = this.shuffleArray(questions);
-        questions.forEach((q: any) => { q.answers = this.shuffleArray(q.answers); });
+        questions.forEach((q: any) => {
+          q.answers = this.shuffleArray(q.answers);
+        });
       } else {
-        if (settings.shuffle_questions) questions = this.shuffleArray(questions);
-        if (settings.shuffle_answers) questions.forEach((q: any) => { q.answers = this.shuffleArray(q.answers); });
+        if (settings.shuffle_questions)
+          questions = this.shuffleArray(questions);
+        if (settings.shuffle_answers)
+          questions.forEach((q: any) => {
+            q.answers = this.shuffleArray(q.answers);
+          });
       }
       const variantId = uuidv4();
       // Yangi structure tuzish (PDF uchun faqat text va options)
@@ -232,23 +356,31 @@ export class TestsService {
         id: variantId,
         questions: questions.map((q: any) => ({
           text: q.text,
-          options: q.answers.map((a: any) => ({ text: a.text }))
-        }))
+          options: q.answers.map((a: any) => ({ text: a.text })),
+        })),
       };
       // To'liq savollar tuzilmasi (scoring uchun)
       const variantQuestions = questions.map((q: any) => ({
         text: q.text,
-        options: q.answers.map((a: any) => ({ text: a.text, isCorrect: a.isCorrect }))
+        options: q.answers.map((a: any) => ({
+          text: a.text,
+          isCorrect: a.isCorrect,
+        })),
       }));
       // PDF generatsiyasi
       const pdfFilePath = await CoverSheetService.generateCover({
         title: test.name,
-        variant: { id: variantId, structure: variantStructure }
+        variant: { id: variantId, structure: variantStructure },
       });
       // DOCX generatsiyasi
       const docxFileName = `${variantId}.docx`;
       const docxFilePath = path.join(outputDir, docxFileName);
-      await this.generateDocxVariant(docxFilePath, variantId, test.name, questions);
+      await this.generateDocxVariant(
+        docxFilePath,
+        variantId,
+        test.name,
+        questions,
+      );
       // Store variant metadata
       await this.prisma.testVariant.create({
         data: {
@@ -259,19 +391,28 @@ export class TestsService {
           questions: variantQuestions,
         },
       });
-      variants.push({ variantId, pdfFilePath, docxFilePath: `/public/generated/${docxFileName}` });
+      variants.push({
+        variantId,
+        pdfFilePath,
+        docxFilePath: `/public/generated/${docxFileName}`,
+      });
     }
     return variants;
   }
 
   shuffleArray(arr: any[]) {
     return arr
-      .map(value => ({ value, sort: Math.random() }))
+      .map((value) => ({ value, sort: Math.random() }))
       .sort((a, b) => a.sort - b.sort)
       .map(({ value }) => value);
   }
 
-  async createPdfVariant(filePath: string, variantId: string, testName: string, questions: any[]) {
+  async createPdfVariant(
+    filePath: string,
+    variantId: string,
+    testName: string,
+    questions: any[],
+  ) {
     return new Promise<void>((resolve, reject) => {
       const doc = new PDFDocument();
       const stream = fs.createWriteStream(filePath);
@@ -298,7 +439,10 @@ export class TestsService {
           const x = startX + col * bubbleSpacingX;
           const y = startY + row * bubbleSpacingY;
           doc.circle(x, y, bubbleRadius).stroke();
-          doc.text(idx.toString(), x - 25, y - 7, { width: 20, align: 'right' });
+          doc.text(idx.toString(), x - 25, y - 7, {
+            width: 20,
+            align: 'right',
+          });
         }
       }
       doc.addPage();
@@ -306,52 +450,75 @@ export class TestsService {
       questions.forEach((q: any, idx: number) => {
         doc.fontSize(14).text(`${idx + 1}. ${q.text}`);
         q.answers.forEach((a: any, aidx: number) => {
-          doc.fontSize(12).text(`   ${String.fromCharCode(65 + aidx)}. ${a.text}`);
+          doc
+            .fontSize(12)
+            .text(`   ${String.fromCharCode(65 + aidx)}. ${a.text}`);
         });
         doc.moveDown();
       });
       doc.end();
       stream.on('finish', () => resolve());
-      stream.on('error', err => reject(err));
+      stream.on('error', (err) => reject(err));
     });
   }
 
-  async checkAnswers(testId: string, answers: { questionId: string; answerIds: string[] }[], userId?: string) {
+  async checkAnswers(
+    testId: string,
+    answers: { questionId: string; answerIds: string[] }[],
+    userId?: string,
+  ) {
     // Fetch test with questions and answers
     const test = await this.prisma.test.findUnique({
       where: { id: testId },
       include: { questions: { include: { answers: true } } },
     });
     if (!test) throw new Error('Test not found');
-    
+
     let correctCount = 0;
-    const breakdown = test.questions.map((q: { id: string; answers: { id: string; text: string; isCorrect: boolean }[] }) => {
-      const submitted = answers.find((a: { questionId: string; answerIds: string[] }) => a.questionId === q.id);
-      const correctAnswer = q.answers.find((a: { isCorrect: boolean }) => a.isCorrect);
-      
-      if (!correctAnswer) {
+    const breakdown = test.questions.map(
+      (q: {
+        id: string;
+        answers: { id: string; text: string; isCorrect: boolean }[];
+      }) => {
+        const submitted = answers.find(
+          (a: { questionId: string; answerIds: string[] }) =>
+            a.questionId === q.id,
+        );
+        const correctAnswer = q.answers.find(
+          (a: { isCorrect: boolean }) => a.isCorrect,
+        );
+
+        if (!correctAnswer) {
+          return {
+            questionId: q.id,
+            selected: submitted?.answerIds || [],
+            correct: null,
+            isCorrect: false,
+            status: 'invalid',
+          };
+        }
+
+        const isCorrect =
+          submitted &&
+          submitted.answerIds.includes(correctAnswer.id) &&
+          submitted.answerIds.length === 1;
+        if (isCorrect) {
+          correctCount++;
+        }
+
         return {
           questionId: q.id,
           selected: submitted?.answerIds || [],
-          correct: null,
-          isCorrect: false,
-          status: 'invalid'
+          correct: { id: correctAnswer.id, text: correctAnswer.text },
+          isCorrect,
+          status: isCorrect
+            ? 'correct'
+            : submitted
+              ? 'incorrect'
+              : 'unanswered',
         };
-      }
-
-      const isCorrect = submitted && submitted.answerIds.includes(correctAnswer.id) && submitted.answerIds.length === 1;
-      if (isCorrect) {
-        correctCount++;
-      }
-
-      return {
-        questionId: q.id,
-        selected: submitted?.answerIds || [],
-        correct: { id: correctAnswer.id, text: correctAnswer.text },
-        isCorrect,
-        status: isCorrect ? 'correct' : (submitted ? 'incorrect' : 'unanswered')
-      };
-    });
+      },
+    );
 
     // Store submission
     await this.prisma.testSubmission.create({
@@ -372,9 +539,9 @@ export class TestsService {
       where: { testId },
       include: {
         user: true,
-        variant: true
+        variant: true,
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
     const workbook = new ExcelJS.Workbook();
@@ -387,10 +554,10 @@ export class TestsService {
       { header: 'Score', key: 'score', width: 10 },
       { header: 'Total', key: 'total', width: 10 },
       { header: 'Percentage', key: 'percentage', width: 10 },
-      { header: 'Date', key: 'date', width: 20 }
+      { header: 'Date', key: 'date', width: 20 },
     ];
 
-    submissions.forEach(submission => {
+    submissions.forEach((submission) => {
       worksheet.addRow({
         id: submission.id,
         username: submission.user?.username || 'Anonymous',
@@ -398,7 +565,7 @@ export class TestsService {
         score: submission.correctCount,
         total: submission.totalCount,
         percentage: `${((submission.correctCount / submission.totalCount) * 100).toFixed(1)}%`,
-        date: submission.createdAt.toLocaleString()
+        date: submission.createdAt.toLocaleString(),
       });
     });
 
@@ -418,19 +585,19 @@ export class TestsService {
           select: {
             id: true,
             username: true,
-            role: true
-          }
+            role: true,
+          },
         },
         variant: {
           select: {
             id: true,
-            filePath: true
-          }
-        }
+            filePath: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
-      take: limit
+      take: limit,
     });
   }
 
@@ -440,8 +607,8 @@ export class TestsService {
       include: {
         test: true,
         variant: true,
-        user: true
-      }
+        user: true,
+      },
     });
 
     if (!submission) {
@@ -465,17 +632,21 @@ export class TestsService {
       createdAt: submission.createdAt,
       test: {
         id: submission.test.id,
-        name: submission.test.name
+        name: submission.test.name,
       },
-      variant: submission.variant ? {
-        id: submission.variant.id,
-        filePath: submission.variant.filePath
-      } : null,
-      user: submission.user ? {
-        id: submission.user.id,
-        username: submission.user.username,
-        role: submission.user.role
-      } : null
+      variant: submission.variant
+        ? {
+            id: submission.variant.id,
+            filePath: submission.variant.filePath,
+          }
+        : null,
+      user: submission.user
+        ? {
+            id: submission.user.id,
+            username: submission.user.username,
+            role: submission.user.role,
+          }
+        : null,
     };
   }
 
@@ -498,7 +669,10 @@ export class TestsService {
     }
     let structure = null;
     try {
-      structure = typeof variant.settings === 'string' ? JSON.parse(variant.settings) : variant.settings;
+      structure =
+        typeof variant.settings === 'string'
+          ? JSON.parse(variant.settings)
+          : variant.settings;
     } catch (e) {
       console.warn('[TestsService] Failed to parse settings JSON:', e);
       return null;
@@ -506,11 +680,19 @@ export class TestsService {
     return { id: variant.id, structure, questions: variant.questions };
   }
 
-  async saveSubmission(testId: string, variantId: string, userId: string, result: any) {
-    const metadata = result.warning || result.debugOverlayPath ? {
-      warning: result.warning,
-      debugOverlayPath: result.debugOverlayPath
-    } : undefined;
+  async saveSubmission(
+    testId: string,
+    variantId: string,
+    userId: string,
+    result: any,
+  ) {
+    const metadata =
+      result.warning || result.debugOverlayPath
+        ? {
+            warning: result.warning,
+            debugOverlayPath: result.debugOverlayPath,
+          }
+        : undefined;
 
     return this.prisma.testSubmission.create({
       data: {
@@ -520,8 +702,8 @@ export class TestsService {
         answers: result.breakdown,
         correctCount: result.score,
         totalCount: result.total,
-        metadata
-      }
+        metadata,
+      },
     });
   }
 }

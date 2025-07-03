@@ -1,4 +1,10 @@
-import { Injectable, UnauthorizedException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+  BadRequestException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
@@ -6,13 +12,31 @@ import { UserDto } from './dto/user.dto';
 import { RegisterDto } from './dto/user.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtUser } from './current-user.decorator';
+import { Roles } from './roles.decorator';
 
 @Injectable()
-export class AuthService {
+export class AuthService implements OnModuleInit {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
   ) {}
+
+  async onModuleInit() {
+    const isAdminExists = await this.prisma.user.findUnique({
+      where: { username: 'admin' },
+    });
+
+    if (!isAdminExists) {
+      const hashedPassword = await bcrypt.hash('exam.app.password.2000', 10);
+      await this.prisma.user.create({
+        data: {
+          username: 'admin',
+          password: hashedPassword,
+          role: 'admin',
+        },
+      });
+    }
+  }
 
   async register(registerDto: RegisterDto) {
     if (registerDto.role !== 'admin' && registerDto.role !== 'user') {
@@ -67,7 +91,10 @@ export class AuthService {
     }
 
     // Verify password
-    const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -125,7 +152,7 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
       include: { questions: true },
     });
-    return tests.map(t => ({
+    return tests.map((t) => ({
       id: t.id,
       title: t.name,
       createdAt: t.createdAt,
@@ -139,7 +166,7 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
       include: { test: true },
     });
-    return submissions.map(s => ({
+    return submissions.map((s) => ({
       submissionId: s.id,
       testTitle: s.test?.name || '',
       correct: s.correctCount,
@@ -149,10 +176,14 @@ export class AuthService {
   }
 
   async getMyStats(userId: string) {
-    const submissions = await this.prisma.testSubmission.findMany({ where: { userId } });
+    const submissions = await this.prisma.testSubmission.findMany({
+      where: { userId },
+    });
     const totalTestsTaken = submissions.length;
-    const scores = submissions.map(s => s.correctCount);
-    const averageScore = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+    const scores = submissions.map((s) => s.correctCount);
+    const averageScore = scores.length
+      ? scores.reduce((a, b) => a + b, 0) / scores.length
+      : 0;
     const highestScore = scores.length ? Math.max(...scores) : 0;
     const lowestScore = scores.length ? Math.min(...scores) : 0;
     return {
@@ -161,5 +192,13 @@ export class AuthService {
       highestScore,
       lowestScore,
     };
+  }
+
+  async getUsersList(userId: string) {
+    const users = await this.prisma.user.findMany();
+    // Exclude password from the returned user objects
+    return users
+      .map(({ password, ...user }) => user)
+      .filter((u) => u.id !== userId);
   }
 }
