@@ -744,6 +744,15 @@ export class TestsService {
       try {
         if (fs.existsSync(docxPath)) fs.unlinkSync(docxPath);
       } catch {}
+      // PDF in public/tests (if present)
+      const testPdfPath = path.join(
+        process.cwd(),
+        'public/tests',
+        `${variant.id}.pdf`,
+      );
+      try {
+        if (fs.existsSync(testPdfPath)) fs.unlinkSync(testPdfPath);
+      } catch {}
     }
     // Delete Excel exports for this test
     const generatedDir = path.join(process.cwd(), 'public/generated');
@@ -763,6 +772,17 @@ export class TestsService {
     // Delete submissions, variants, questions, answers, settings (cascades if FK is set)
     await this.prisma.testSubmission.deleteMany({ where: { testId } });
     await this.prisma.testVariant.deleteMany({ where: { testId } });
+    // Delete answers for all questions of this test
+    const questions = await this.prisma.question.findMany({
+      where: { testId },
+      select: { id: true },
+    });
+    const questionIds = questions.map((q) => q.id);
+    if (questionIds.length > 0) {
+      await this.prisma.answer.deleteMany({
+        where: { questionId: { in: questionIds } },
+      });
+    }
     await this.prisma.question.deleteMany({ where: { testId } });
     await this.prisma.testSettings.deleteMany({ where: { testId } });
     // Delete the test itself
