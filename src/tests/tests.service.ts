@@ -108,6 +108,7 @@ export class TestsService {
       question: string;
       answers: { text: string; isCorrect: boolean }[];
     }[],
+    userId: string,
   ) {
     return this.prisma.test.create({
       data: {
@@ -124,6 +125,11 @@ export class TestsService {
                 : [],
             },
           })),
+        },
+        user: {
+          connect: {
+            id: userId,
+          },
         },
       },
       include: {

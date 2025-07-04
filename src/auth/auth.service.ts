@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   OnModuleInit,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
@@ -13,6 +14,7 @@ import { RegisterDto } from './dto/user.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtUser } from './current-user.decorator';
 import { Roles } from './roles.decorator';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -146,9 +148,15 @@ export class AuthService implements OnModuleInit {
   }
 
   async getMyTests(userId: string) {
-    // If you want to track uploader, add a createdBy field to Test. For now, return all tests (or filter if field exists)
-    // Placeholder: return all tests
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new ForbiddenException();
+
+    const where = {
+      userId: user.role !== 'admin' ? user.id : undefined,
+    };
+
     const tests = await this.prisma.test.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: { questions: true },
     });

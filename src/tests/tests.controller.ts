@@ -56,7 +56,7 @@ export class TestsController {
 
   @Post('upload')
   @UseGuards(RolesGuard)
-  @Roles('admin')
+  // @Roles('admin')
   @UseInterceptors(
     PlatformFileInterceptor('file', {
       fileFilter: (
@@ -115,7 +115,7 @@ export class TestsController {
     const { name } = req.body;
     if (!name) throw new BadRequestException('Test name is required');
     const parsed = await this.testsService.parseDocx(file.buffer);
-    return this.testsService.saveTest(name, parsed.questions);
+    return this.testsService.saveTest(name, parsed.questions, user.userId);
   }
 
   @Post(':testId/settings')
